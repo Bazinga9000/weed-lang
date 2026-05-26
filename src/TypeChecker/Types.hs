@@ -2,12 +2,8 @@ module TypeChecker.Types where
 
 data TypeConstraint
   = CUnconstrained
-  | CRollable
+  | CRollable WeedType
   deriving (Show, Eq, Ord)
-
-strictest :: TypeConstraint -> TypeConstraint -> TypeConstraint
-strictest CUnconstrained CUnconstrained = CUnconstrained
-strictest _ _ = CRollable
 
 newtype TypeVarName = TypeVarName Int
   deriving (Show, Eq, Ord)
@@ -30,7 +26,7 @@ data WeedType
   | TDice WeedType -- Dice a
   | TPool WeedType -- Pool a
   | TVar ConstrainedName -- a type variable
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 nameOf :: WeedType -> TypeVarName
 nameOf (TVar (ConstrainedName n _)) = n
@@ -39,12 +35,6 @@ nameOf _ = error "nameOf: not a TVar"
 constraintOf :: WeedType -> TypeConstraint
 constraintOf (TVar (ConstrainedName _ c)) = c
 constraintOf _ = error "constraintOf: not a TVar"
-
-satisfies :: TypeConstraint -> WeedType -> Bool
-satisfies CUnconstrained _ = True
-satisfies CRollable (TDice _) = True
-satisfies CRollable (TPool _) = True
-satisfies CRollable _ = False
 
 matches :: TypeVarName -> WeedType -> Bool
 matches a (TVar (ConstrainedName b _)) = a == b

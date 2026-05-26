@@ -18,12 +18,17 @@ bind :: ConstrainedName -> WeedType -> Infer Subst
 bind (ConstrainedName a c) t
   | matches a t = return nullSubst
   | occursCheck a t = throwError $ "Infinite type: " ++ show a ++ " occurs in " ++ show t
-  | otherwise = case t of
-      TVar (ConstrainedName b c2) -> return $ Map.singleton a (TVar (ConstrainedName b (strictest c c2)))
-      _ ->
-        if satisfies c t
-          then return (Map.singleton a t)
-          else throwError $ "Type mismatch: " ++ show t ++ " does not satisfy " ++ show c
+  | otherwise = case (c, t) of
+      -- If constrained to be Rollable, ensure the actual type is Dice or Pool
+      -- AND unify the inner type of the constraint with the actual inner type.
+      (CRollable expectedInner, TDice actualInner) -> do
+        sInner <- unify expectedInner actualInner
+        return $ Map.singleton a t `compose` sInner
+      (CRollable expectedInner, TPool actualInner) -> do
+        sInner <- unify expectedInner actualInner
+        return $ Map.singleton a t `compose` sInner
+      (CUnconstrained, _) -> return (Map.singleton a t)
+      _ -> throwError $ "Type mismatch: " ++ show t ++ " does not satisfy " ++ show c
 
 unify :: WeedType -> WeedType -> Infer Subst
 unify (a `TFunction` b) (a' `TFunction` b') = do

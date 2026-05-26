@@ -10,7 +10,7 @@ class PrettyPrintable a where
 
 instance PrettyPrintable TypeConstraint where
   prettyPrint CUnconstrained = ""
-  prettyPrint CRollable = "_r"
+  prettyPrint (CRollable t) = "_r" ++ prettyPrint t
 
 instance PrettyPrintable TypeVarName where
   prettyPrint (TypeVarName n) = "t" ++ show n

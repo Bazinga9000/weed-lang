@@ -17,6 +17,13 @@ class Substitutable a where
   apply :: Subst -> a -> a
   ftv :: a -> Set.Set TypeVarName
 
+instance Substitutable TypeConstraint where
+  apply _ CUnconstrained = CUnconstrained
+  apply s (CRollable t) = CRollable (apply s t)
+
+  ftv CUnconstrained = Set.empty
+  ftv (CRollable t) = ftv t
+
 instance Substitutable WeedType where
   apply _ TNumber = TNumber
   apply _ TBool = TBool
