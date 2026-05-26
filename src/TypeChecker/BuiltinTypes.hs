@@ -83,6 +83,10 @@ builtinType Constant = do
   tv <- fresh CUnconstrained
   return $ noPoly $ (tv ->> TDice tv)
 builtinType Collapse = return $ noPoly $ (TPool TNumber ->> TDice TNumber)
+builtinType Source = do
+  tv <- fresh CUnconstrained
+  rctv <- fresh (CRollable tv)
+  return $ ForAll [constrainedNameOf tv, constrainedNameOf rctv] (rctv ->> TDice tv)
 builtinType MkPool = do
   tv <- fresh CUnconstrained
   return $ noPoly $ (TNumber ->> TDice tv ->> TPool tv)

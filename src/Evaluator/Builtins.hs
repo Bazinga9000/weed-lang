@@ -250,6 +250,12 @@ fetchBuiltin Collapse = VBuiltin $ collapse
     collapse :: Value -> Eval Value
     collapse (VPool pool _) = return $ VDice $ (VNumber . sum) <$> (pool >>= (mapM assertNumber))
     collapse e = throwError $ TypeError (TPool TNumber) e
+fetchBuiltin Source = VBuiltin $ source
+  where
+    source :: Value -> Eval Value
+    source (VDice d) = return $ VDice d
+    source (VPool _ s) = return $ VDice s
+    source e = throwError $ TypeError (TPool TNumber) e -- again, this typeerror's type is morally wrong, but the typechecker should catch this
 fetchBuiltin MkPool = VBuiltin $ \n -> return $ VBuiltin $ \d -> mkPool n d
   where
     mkPool :: Value -> Value -> Eval Value

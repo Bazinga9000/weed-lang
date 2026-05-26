@@ -60,6 +60,7 @@ instance PrettyPrintable Builtin where
   prettyPrint DiceCircle = "circle"
   prettyPrint Constant = "constant"
   prettyPrint Collapse = "collapse"
+  prettyPrint Source = "source"
   prettyPrint MkPool = "(#)"
   prettyPrint Sum = "sum"
 

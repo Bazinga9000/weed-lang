@@ -50,6 +50,7 @@ data Builtin -- unary operators
   | -- dice maniulation
     Constant
   | Collapse
+  | Source
   | MkPool
   | Sum
   deriving (Show, Eq, Ord)
