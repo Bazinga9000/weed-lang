@@ -80,7 +80,7 @@ instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTList t xs) = prettyPrint xs ++ "::" ++ prettyPrint t
   prettyPrint (CTIdentifier t n) = "(" ++ prettyPrint n ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTLambda t ident body) = "(λ" ++ prettyPrint ident ++ "::" ++ prettyPrint t ++ " -> " ++ prettyPrint body ++ ")"
-  prettyPrint (CTApply t a b) = "(apply " ++ prettyPrint a ++ " " ++ prettyPrint b ++ "::" ++ prettyPrint t ++ ")"
+  prettyPrint (CTApply t a b) = "(apply :: " ++ prettyPrint t ++ " " ++ prettyPrint a ++ " " ++ prettyPrint b ++ ")"
   prettyPrint (CTIf t cond tb fb) = "(if " ++ prettyPrint cond ++ " then " ++ prettyPrint tb ++ " else " ++ prettyPrint fb ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTLet t ident expr body) = "(let " ++ prettyPrint ident ++ " = " ++ prettyPrint expr ++ " in " ++ prettyPrint body ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTMapPool t f pool) = "(map " ++ prettyPrint f ++ " " ++ prettyPrint pool ++ "::" ++ prettyPrint t ++ ")"
