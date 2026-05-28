@@ -8,25 +8,30 @@ import TypeChecker.Types
 class PrettyPrintable a where
   prettyPrint :: a -> String
 
+instance PrettyPrintable WeedTypeClass where
+  prettyPrint CFunctor = "Functor"
+  prettyPrint CMonad = "Monad"
+  prettyPrint CRollable = "Rollable"
+
 instance PrettyPrintable TypeConstraint where
-  prettyPrint CUnconstrained = ""
-  prettyPrint (CRollable t) = "_r" ++ prettyPrint t
+  prettyPrint (CInstanceOf cls tv) = prettyPrint cls ++ " " ++ prettyPrint tv
 
 instance PrettyPrintable TypeVarName where
   prettyPrint (TypeVarName n) = "t" ++ show n
-
-instance PrettyPrintable ConstrainedName where
-  prettyPrint (ConstrainedName n c) = prettyPrint n ++ prettyPrint c
 
 instance PrettyPrintable WeedType where
   prettyPrint TNumber = "ℕ"
   prettyPrint TBool = "𝔹"
   prettyPrint TUnit = "()"
   prettyPrint (TFunction t1 t2) = "(" ++ prettyPrint t1 ++ " -> " ++ prettyPrint t2 ++ ")"
-  prettyPrint (TList t) = "[" ++ prettyPrint t ++ "]"
-  prettyPrint (TDice t) = "(Dice " ++ prettyPrint t ++ ")"
-  prettyPrint (TPool t) = "(Pool " ++ prettyPrint t ++ ")"
+  prettyPrint (TApp TList t) = "[" ++ prettyPrint t ++ "]"
+  prettyPrint (TApp TDice t) = "(Dice " ++ prettyPrint t ++ ")"
+  prettyPrint (TApp TPool t) = "(Pool " ++ prettyPrint t ++ ")"
+  prettyPrint TList = "[]"
+  prettyPrint TDice = "Dice"
+  prettyPrint TPool = "Pool"
   prettyPrint (TVar n) = prettyPrint n
+  prettyPrint (TApp t1 t2) = "(" ++ prettyPrint t1 ++ " " ++ prettyPrint t2 ++ ")"
 
 instance PrettyPrintable Builtin where
   prettyPrint Negate = "negate"
@@ -61,7 +66,7 @@ instance PrettyPrintable Builtin where
   prettyPrint Constant = "constant"
   prettyPrint Collapse = "collapse"
   prettyPrint Source = "source"
-  prettyPrint MkPool = "(#)"
+  prettyPrint Poolify = "(#)"
   prettyPrint Sum = "sum"
 
 instance PrettyPrintable IdentifierName where

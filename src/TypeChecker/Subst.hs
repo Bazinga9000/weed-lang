@@ -18,34 +18,34 @@ class Substitutable a where
   ftv :: a -> Set.Set TypeVarName
 
 instance Substitutable TypeConstraint where
-  apply _ CUnconstrained = CUnconstrained
-  apply s (CRollable t) = CRollable (apply s t)
+  apply s (CInstanceOf c t) = CInstanceOf c (apply s t)
 
-  ftv CUnconstrained = Set.empty
-  ftv (CRollable t) = ftv t
+  ftv (CInstanceOf _ t) = ftv t
 
 instance Substitutable WeedType where
   apply _ TNumber = TNumber
   apply _ TBool = TBool
   apply _ TUnit = TUnit
   apply s (TFunction a b) = TFunction (apply s a) (apply s b)
-  apply s (TList t) = TList (apply s t)
-  apply s (TDice t) = TDice (apply s t)
-  apply s (TPool t) = TPool (apply s t)
-  apply s v@(TVar (ConstrainedName name _)) = Map.findWithDefault v name s
+  apply _ TList = TList
+  apply _ TDice = TDice
+  apply _ TPool = TPool
+  apply s v@(TVar n) = Map.findWithDefault v n s
+  apply s (TApp a b) = TApp (apply s a) (apply s b)
 
   ftv TNumber = Set.empty
   ftv TBool = Set.empty
   ftv TUnit = Set.empty
   ftv (TFunction a b) = ftv a `Set.union` ftv b
-  ftv (TList t) = ftv t
-  ftv (TDice t) = ftv t
-  ftv (TPool t) = ftv t
-  ftv (TVar (ConstrainedName name _)) = Set.singleton name
+  ftv TList = Set.empty
+  ftv TDice = Set.empty
+  ftv TPool = Set.empty
+  ftv (TVar n) = Set.singleton n
+  ftv (TApp a b) = ftv a `Set.union` ftv b
 
 instance Substitutable WeedTypeScheme where
-  apply s (ForAll vars t) = ForAll vars (apply s t)
-  ftv (ForAll vars t) = ftv t `Set.difference` Set.fromList (map dropConstraint vars)
+  apply s (ForAll vars cs t) = ForAll vars (apply s cs) (apply s t)
+  ftv (ForAll vars cs t) = ftv t `Set.difference` (ftv cs `Set.union` (Set.fromList vars))
 
 instance (Substitutable a) => Substitutable [a] where
   apply s = map (apply s)

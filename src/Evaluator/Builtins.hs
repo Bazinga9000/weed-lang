@@ -34,7 +34,7 @@ assertBoolE e = throwError $ TypeError (TBool) e
 
 assertListE :: Value -> Eval [Value]
 assertListE (VList xs) = return $ xs
-assertListE e = throwError $ TypeError (TList TUnit) e -- expected type is morally wrong, but this should never happen
+assertListE e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
 
 --
 -- Helper functions to lift functions into builtins that automatically lift/collapse into dice expressions.
@@ -54,7 +54,7 @@ liftNumber f = VBuiltin $ liftNumber'
               return $ VNumber (f n)
           )
     liftNumber' (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftNumber' e = throwError $ TypeError (TDice TNumber) e
+    liftNumber' e = throwError $ TypeError (mkDice TNumber) e
 
 liftBool :: (Bool -> Bool) -> Value
 liftBool f = VBuiltin $ liftBool'
@@ -69,7 +69,7 @@ liftBool f = VBuiltin $ liftBool'
               return $ VBool (f b)
           )
     liftBool' (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftBool' e = throwError $ TypeError (TDice TBool) e
+    liftBool' e = throwError $ TypeError (mkDice TBool) e
 
 liftNumber2 :: (WeedNumber -> WeedNumber -> WeedNumber) -> Value
 liftNumber2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftNumber2' a b
@@ -87,7 +87,7 @@ liftNumber2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftNumber2' a b
           )
     liftNumber2' _ (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
     liftNumber2' (VPool _ _) _ = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftNumber2' _ e = throwError $ TypeError (TDice TNumber) e
+    liftNumber2' _ e = throwError $ TypeError (mkDice TNumber) e
 
 liftBool2 :: (Bool -> Bool -> Bool) -> Value
 liftBool2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftBool2' a b
@@ -105,7 +105,7 @@ liftBool2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftBool2' a b
           )
     liftBool2' _ (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
     liftBool2' (VPool _ _) _ = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftBool2' _ e = throwError $ TypeError (TDice TBool) e
+    liftBool2' _ e = throwError $ TypeError (mkDice TBool) e
 
 liftRoll2 :: WeedType -> (Roll Value -> Roll Value -> Roll Value) -> Value
 liftRoll2 t f = VBuiltin $ \a -> return $ VBuiltin $ \b -> return $ VDice $ liftRoll2' a b
@@ -114,7 +114,7 @@ liftRoll2 t f = VBuiltin $ \a -> return $ VBuiltin $ \b -> return $ VDice $ lift
     liftRoll2' (VNumber _) _ = throwError $ InterpreterBug "automatic number -> dice lifting failed"
     liftRoll2' _ (VNumber _) = throwError $ InterpreterBug "automatic number -> dice lifting failed"
     liftRoll2' (VDice d) (VDice d') = f d d'
-    liftRoll2' _ e = throwError $ TypeError (TDice t) e
+    liftRoll2' _ e = throwError $ TypeError (mkDice t) e
 
 liftValue2 :: (Value -> Value -> Eval Value) -> Value
 liftValue2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> f a b
@@ -249,26 +249,26 @@ fetchBuiltin Collapse = VBuiltin $ collapse
   where
     collapse :: Value -> Eval Value
     collapse (VPool pool _) = return $ VDice $ (VNumber . sum) <$> (pool >>= (mapM assertNumber))
-    collapse e = throwError $ TypeError (TPool TNumber) e
+    collapse e = throwError $ TypeError (mkPool TNumber) e
 fetchBuiltin Source = VBuiltin $ source
   where
     source :: Value -> Eval Value
     source (VDice d) = return $ VDice d
     source (VPool _ s) = return $ VDice s
-    source e = throwError $ TypeError (TPool TNumber) e -- again, this typeerror's type is morally wrong, but the typechecker should catch this
-fetchBuiltin MkPool = VBuiltin $ \n -> return $ VBuiltin $ \d -> mkPool n d
+    source e = throwError $ TypeError (mkPool TNumber) e -- again, this typeerror's type is morally wrong, but the typechecker should catch this
+fetchBuiltin Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
   where
-    mkPool :: Value -> Value -> Eval Value
-    mkPool v@(VNumber _) (VDice d) = do
-      n' <- assertRealE MkPool v -- TODO: this is stupid. we know v is a number, but this checks that again
+    poolify :: Value -> Value -> Eval Value
+    poolify v@(VNumber _) (VDice d) = do
+      n' <- assertRealE Poolify v -- TODO: this is stupid. we know v is a number, but this checks that again
       case getExactInteger n' of
-        Nothing -> throwError $ BadDieParameter MkPool "expected an integer number of dice" v
+        Nothing -> throwError $ BadDieParameter Poolify "expected an integer number of dice" v
         Just count ->
           if count == 0
-            then throwError $ BadDieParameter MkPool "expected a positive number of dice" v
+            then throwError $ BadDieParameter Poolify "expected a positive number of dice" v
             else return $ VPool (replicateM count d) d
-    mkPool (VNumber _) e = throwError $ TypeError (TDice TNumber) e
-    mkPool n _ = throwError $ TypeError TNumber n
+    poolify (VNumber _) e = throwError $ TypeError (mkDice TNumber) e
+    poolify n _ = throwError $ TypeError TNumber n
 fetchBuiltin Sum = VBuiltin $ \xs -> do
   xs' <- assertListE xs
   VNumber . sum <$> (mapM assertNumberE xs')

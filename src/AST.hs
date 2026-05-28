@@ -51,7 +51,7 @@ data Builtin -- unary operators
     Constant
   | Collapse
   | Source
-  | MkPool
+  | Poolify
   | Sum
   deriving (Show, Eq, Ord)
 

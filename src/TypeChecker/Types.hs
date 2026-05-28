@@ -1,44 +1,55 @@
 module TypeChecker.Types where
 
-data TypeConstraint
-  = CUnconstrained
-  | CRollable WeedType
-  deriving (Show, Eq, Ord)
+type TypeError = String
 
-newtype TypeVarName = TypeVarName Int
-  deriving (Show, Eq, Ord)
+-- functor: implemented by [], Dice, Pool
+-- monad: implemented by Dice, Pool
+-- rollable: implemented by Dice, Pool
+data WeedTypeClass = CFunctor | CMonad | CRollable deriving (Show)
 
-data ConstrainedName = ConstrainedName TypeVarName TypeConstraint deriving (Show, Eq, Ord)
+newtype TypeVarName = TypeVarName Int deriving (Show, Eq, Ord)
 
-constrainedNameOf :: WeedType -> ConstrainedName
-constrainedNameOf (TVar cn) = cn
-constrainedNameOf _ = error "constrainedNameOf: not a TVar"
-
-dropConstraint :: ConstrainedName -> TypeVarName
-dropConstraint (ConstrainedName n _) = n
+-- we only collect typeclass constraints. equality is eagerly unified.
+-- haskell also does this, for instance
+data TypeConstraint = CInstanceOf WeedTypeClass WeedType
+  deriving (Show)
 
 data WeedType
   = TNumber
   | TBool
   | TUnit -- ()
   | TFunction WeedType WeedType -- a -> b
-  | TList WeedType -- [a]
-  | TDice WeedType -- Dice a
-  | TPool WeedType -- Pool a
-  | TVar ConstrainedName -- a type variable
+  | TList -- []
+  | TDice -- Dice a
+  | TPool -- Pool a
+  | TVar TypeVarName -- a type variable
+  | TApp WeedType WeedType -- a b
   deriving (Show, Eq, Ord)
 
+-- helpers for type construction
+infixr 0 ->>
+
+(->>) :: WeedType -> WeedType -> WeedType
+(->>) = TFunction
+
+mkList :: WeedType -> WeedType
+mkList = TApp TList
+
+mkDice :: WeedType -> WeedType
+mkDice = TApp TDice
+
+mkPool :: WeedType -> WeedType
+mkPool = TApp TPool
+
 nameOf :: WeedType -> TypeVarName
-nameOf (TVar (ConstrainedName n _)) = n
+nameOf (TVar n) = n
 nameOf _ = error "nameOf: not a TVar"
 
-constraintOf :: WeedType -> TypeConstraint
-constraintOf (TVar (ConstrainedName _ c)) = c
-constraintOf _ = error "constraintOf: not a TVar"
+isDiceOrPool :: WeedType -> Bool
+isDiceOrPool t = case t of
+  TApp TDice _ -> True
+  TApp TPool _ -> True
+  _ -> False
 
-matches :: TypeVarName -> WeedType -> Bool
-matches a (TVar (ConstrainedName b _)) = a == b
-matches _ _ = False
-
-data WeedTypeScheme = ForAll [ConstrainedName] WeedType
+data WeedTypeScheme = ForAll [TypeVarName] [TypeConstraint] WeedType
   deriving (Show)

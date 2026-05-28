@@ -1,157 +1,145 @@
 module TypeChecker where
 
 import AST
-import Control.Monad (foldM)
 import Control.Monad.Except
-import Control.Monad.State
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import Control.Monad.RWS
 import TypeChecker.BuiltinTypes
 import TypeChecker.Infer
 import TypeChecker.Subst
 import TypeChecker.Types
 
-occursCheck :: (Substitutable a) => TypeVarName -> a -> Bool
-occursCheck a t = a `Set.member` ftv t
+-- infer the type of an untyped expression,
+-- emitting all necesssary constraints for the solver to un
+infer :: CoreUntypedExpr -> Infer (WeedType, CoreTypedExpr)
+infer (CUNumber n) = return $ (TNumber, CTNumber n)
+infer (CUBool b) = return $ (TBool, CTBool b)
+infer (CUUnit) = return $ (TUnit, CTUnit)
+infer (CUList []) = do
+  t <- fresh
+  return $ (mkList t, CTList t [])
+infer (CUList (x : xs)) = do
+  t <- fresh
+  (tx, cx) <- infer x
+  (txs, cxs) <- infer (CUList xs)
+  unify t tx
+  unify (mkList t) txs
+  let listType = mkList t
+  newList <- (CTList listType) <$> appendCList cx cxs
+  return $ (listType, newList)
+  where
+    appendCList :: CoreTypedExpr -> CoreTypedExpr -> Infer [CoreTypedExpr]
+    appendCList cx (CTList _ cxs) = return $ (cx : cxs)
+    appendCList _ e = throwError $ "TC Bug: Expected a list, got " ++ show e
+infer (CUIdentifier (B builtin)) = do
+  t <- builtinType builtin >>= instantiate
+  return $ (t, CTIdentifier t (B builtin))
+infer (CUIdentifier ident) = (\t -> (t, CTIdentifier t ident)) <$> lookupEnv ident
+infer (CULambda ident body) = do
+  tv <- fresh
+  (tb, cb) <- inEnv (ident, ForAll [] [] tv) (infer body)
+  let tl = TFunction tv tb
+  return (tl, CTLambda tl ident cb)
+infer (CUApply f arg) = do
+  (tf, cf) <- infer f
+  (ta, ca) <- infer arg
 
-bind :: ConstrainedName -> WeedType -> Infer Subst
-bind (ConstrainedName a c) t
-  | matches a t = return nullSubst
-  | occursCheck a t = throwError $ "Infinite type: " ++ show a ++ " occurs in " ++ show t
-  | otherwise = case (c, t) of
-      -- If constrained to be Rollable, ensure the actual type is Dice or Pool
-      -- AND unify the inner type of the constraint with the actual inner type.
-      (CRollable expectedInner, TDice actualInner) -> do
-        sInner <- unify expectedInner actualInner
-        return $ Map.singleton a t `compose` sInner
-      (CRollable expectedInner, TPool actualInner) -> do
-        sInner <- unify expectedInner actualInner
-        return $ Map.singleton a t `compose` sInner
-      (CUnconstrained, _) -> return (Map.singleton a t)
-      _ -> throwError $ "Type mismatch: " ++ show t ++ " does not satisfy " ++ show c
+  tr <- fresh
 
-unify :: WeedType -> WeedType -> Infer Subst
-unify (a `TFunction` b) (a' `TFunction` b') = do
-  s1 <- unify a a'
-  s2 <- unify (apply s1 b) (apply s1 b')
-  return $ s2 `compose` s1
-unify (TVar (ConstrainedName a c)) t = bind (ConstrainedName a c) t
-unify t (TVar (ConstrainedName a c)) = bind (ConstrainedName a c) t
-unify TNumber TNumber = return nullSubst
-unify TBool TBool = return nullSubst
-unify TUnit TUnit = return nullSubst
-unify (TList a) (TList a') = unify a a'
-unify (TDice a) (TDice a') = unify a a'
-unify (TPool a) (TPool a') = unify a a'
-unify t1 t2 = throwError $ "Could not unify" ++ show t1 ++ " and " ++ show t2
+  -- Grab the current state so we can see the true structural shapes
+  s <- currentSubst <$> get
+  let tf' = apply s tf
+  let ta' = apply s ta
 
-infer :: TypeEnv -> CoreUntypedExpr -> Infer (Subst, WeedType, CoreTypedExpr)
-infer env expr = case expr of
-  CUNumber n -> return (nullSubst, TNumber, CTNumber n)
-  CUBool b -> return (nullSubst, TBool, CTBool b)
-  CUUnit -> return (nullSubst, TUnit, CTUnit)
-  CUList [] -> do
-    tv <- fresh CUnconstrained
-    return (nullSubst, TList tv, CTList (TList tv) [])
-  CUList (x : xs) -> do
-    (s1, tHead, typedHead) <- infer env x
+  -- Attempt eager structural unification
+  case unify' tf' (TFunction ta' tr) of
+    -- SUCCESS: Standard application
+    Right newSub -> do
+      modify (\curr -> curr {currentSubst = newSub `compose` s})
+      return (tr, CTApply tr cf ca)
 
-    let process (subst, typedList) e = do
-          (sNext, tNext, typedNext) <- infer (apply subst env) e
-          sUnified <- unify (apply sNext (apply subst tHead)) tNext
-          let combinedSubst = sUnified `compose` sNext `compose` subst
-          return (combinedSubst, typedList ++ [typedNext])
+    -- FAILURE: Intercept the structural mismatch to attempt coercion
+    Left origErr -> case tf' of
+      TFunction texp tret ->
+        case (texp, ta') of
+          -- RULE 2: Pool Collapse (Expected: Dice Number, Actual: Pool Number)
+          (TApp TDice TNumber, TApp TPool TNumber) -> do
+            unify tret tr
+            let tcollapse = TFunction (TApp TPool TNumber) (TApp TDice TNumber)
+            let collapse = CTIdentifier tcollapse (B Collapse)
+            let coerced = CTApply (TApp TDice TNumber) collapse ca
+            return (tret, CTApply tret cf coerced)
 
-    (sFinal, typedList) <- foldM process (s1, [typedHead]) xs
+          -- RULE 3: Pool Mapping (Expected: [a], Actual: Pool a)
+          (TApp TList texpInner, TApp TPool tInner) -> do
+            unify texpInner tInner
+            let mapped = TApp TDice tret
+            unify tr mapped
+            return (mapped, CTMapPool mapped cf ca)
 
-    let finalType = TList (apply sFinal tHead)
-    let finalAST = CTList finalType typedList
+          -- RULE 1: Scalar Lifting (Expected: Dice a, Actual: a (but NOT a Dice/Pool))
+          (TApp TDice texpInner, tscalar)
+            | not (isDiceOrPool tscalar) -> do
+                unify texpInner tscalar
+                unify tret tr
+                let tconst = TFunction tscalar tret
+                let constNode = CTIdentifier tconst (B Constant)
+                let coercedArg = CTApply texp constNode ca
+                return (tr, CTApply tr cf coercedArg)
+          _ -> throwError origErr
+      _ -> throwError origErr
+infer (CUIf cond t f) = do
+  (tc, cc) <- infer cond
+  (tt, ct) <- infer t
+  (tf, cf) <- infer f
+  unify tc TBool
+  unify tt tf
+  return (tt, CTIf tc cc ct cf)
+infer (CULet ident val body) = do
+  -- infer the value and trap its class constraints
+  ((tVal, typedVal), valConstraints) <- listen $ censor (const []) (infer val)
 
-    return (sFinal, finalType, finalAST)
-  CUIdentifier (B builtin) -> do
-    (subst, t) <- lookupBuiltin builtin
-    return (subst, t, CTIdentifier t (B builtin))
-  CUIdentifier ident -> do
-    (subst, t) <- lookupEnv env ident
-    return (subst, t, CTIdentifier t ident)
-  CULambda ident body -> do
-    tv <- fresh CUnconstrained
-    let env' = env `extend` (ident, ForAll [] tv)
-    (subst, tBody, typedBody) <- infer env' body
-    let lambdaType = TFunction (apply subst tv) tBody
-    return (subst, lambdaType, CTLambda lambdaType ident typedBody)
-  CUApply f arg -> do
-    (s1, tF, typedF) <- infer env f
-    (s2, tArg, typedArg) <- infer (apply s1 env) arg
+  -- generalize the value's type scheme
+  scheme <- generalize tVal valConstraints
 
-    let tF' = apply s2 tF
-    tvRes <- fresh CUnconstrained
+  -- extend the environment and infer the body
+  (tBody, typedBody) <- inEnv (ident, scheme) (infer body)
+  return (tBody, CTLet tBody ident typedVal typedBody)
 
-    let tryStandardApp = do
-          s3 <- unify tF' (tArg `TFunction` tvRes)
-          let tRes = apply s3 tvRes
-          return (s3 `compose` s2 `compose` s1, tRes, CTApply tRes typedF typedArg)
+-- solve the constraints generated by infer
+solve :: Subst -> [TypeConstraint] -> Either TypeError ()
+solve finalSubst constraints =
+  mapM_ solveOne $ apply finalSubst constraints
+  where
+    baseType :: WeedType -> WeedType
+    baseType (TApp t _) = baseType t
+    baseType t = t
 
-    let tryCoercedApp = case tF' of
-          (tExpectedParam `TFunction` tReturn) ->
-            -- Rule A: Function expects Dice Number, Arg is Number
-            if tExpectedParam == TDice TNumber && tArg == TNumber
-              then do
-                s3 <- unify tF' (TDice TNumber `TFunction` tvRes)
-                let tRes = apply s3 tvRes
-                let coercedArg = CTApply (TDice TNumber) (CTIdentifier (TNumber `TFunction` TDice TNumber) (B Constant)) typedArg
-                return (s3 `compose` s2 `compose` s1, tRes, CTApply tRes typedF coercedArg)
-
-              -- Rule B: Function expects Dice Number, Arg is Pool Number
-              else
-                if tExpectedParam == TDice TNumber && tArg == TPool TNumber
-                  then do
-                    s3 <- unify tF' (TDice TNumber `TFunction` tvRes)
-                    let tRes = apply s3 tvRes
-                    let coercedArg = CTApply (TDice TNumber) (CTIdentifier (TPool TNumber `TFunction` TDice TNumber) (B Collapse)) typedArg
-                    return (s3 `compose` s2 `compose` s1, tRes, CTApply tRes typedF coercedArg)
-
-                  -- Rule C: Function expects [a], Arg is Pool a
-                  else case (tExpectedParam, tArg) of
-                    (TList tInner1, TPool tInner2) -> do
-                      -- Ensure the inner types match (e.g. [Number] matches Pool Number)
-                      sInner <- unify tInner1 tInner2
-                      -- The result is wrapped in the Dice monad
-                      let tRes = TDice (apply sInner tReturn)
-                      let mappedAST = CTMapPool tRes typedF typedArg
-                      return (sInner `compose` s2 `compose` s1, tRes, mappedAST)
-                    _ -> throwError "Coercion structural mismatch."
-          _ -> throwError "Not a function."
-
-    tryStandardApp `catchError` \_ ->
-      tryCoercedApp `catchError` \_ ->
-        throwError $ "Type mismatch in application. Could not apply " ++ show tF' ++ " to " ++ show tArg
-  CUIf p te fe -> do
-    (s1, tP, typedP) <- infer env p
-    (s2, tTe, typedTe) <- infer (apply s1 env) te
-    (s3, tFe, typedFe) <- infer (apply (s2 `compose` s1) $ env) fe
-
-    s4 <- unify tP TBool
-    s5 <- unify (apply s4 tTe) (apply s4 tFe)
-
-    let subst = s5 `compose` s4 `compose` s3 `compose` s2 `compose` s1
-    let ifType = apply s5 (apply s4 tTe)
-    return (subst, ifType, CTIf ifType typedP typedTe typedFe)
-  CULet ident binding body -> do
-    (s1, tBinding, typedBinding) <- infer env binding
-    let env' = apply s1 env
-    let t' = generalize env' tBinding
-    (s2, tBody, typedBody) <- infer (env' `extend` (ident, t')) body
-    let subst = s2 `compose` s1
-    return (subst, tBody, CTLet tBody ident typedBinding typedBody)
-
--- the very last apply subst texpr cleans up any stale types left over in the annotations
-runInfer :: Infer (Subst, WeedType, CoreTypedExpr) -> Either TypeError CoreTypedExpr
-runInfer m = case evalState (runExceptT m) 0 of
-  Left err -> Left err
-  Right (subst, _, texpr) -> Right $ apply subst texpr
+    solveOne :: TypeConstraint -> Either TypeError ()
+    solveOne (CInstanceOf cls t) =
+      let base = baseType t
+       in case (cls, base) of
+            -- Functor
+            (CFunctor, TList) -> Right ()
+            (CFunctor, TDice) -> Right ()
+            (CFunctor, TPool) -> Right ()
+            -- Monad
+            (CMonad, TList) -> Right ()
+            (CMonad, TDice) -> Right ()
+            (CMonad, TPool) -> Right ()
+            -- Rollable
+            (CRollable, TDice) -> Right ()
+            (CRollable, TPool) -> Right ()
+            -- Ambiguous top-level type variable
+            (c, TVar tv) -> Left $ "Ambiguous type variable " ++ show tv ++ " for class " ++ show c
+            -- Missing instance
+            (c, t') -> Left $ "No instance for " ++ show c ++ " for type " ++ show t'
 
 typeCheck :: CoreUntypedExpr -> Either TypeError CoreTypedExpr
-typeCheck expr = runInfer $ infer env expr
-  where
-    env = TypeEnv Map.empty
+typeCheck expr = do
+  -- infer, fetch all constraints
+  ((_, typed), finalState, constraints) <- runExcept $ runRWST (infer expr) emptyEnv freshState
+  let subst = currentSubst finalState
+  -- solve the constraints
+  solve subst constraints
+  -- if we got here, constraint solving succeded, apply the final subs to concretize every node's type
+  return $ apply subst typed
