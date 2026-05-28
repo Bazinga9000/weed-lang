@@ -62,6 +62,7 @@ data SurfaceExpr
   | SIdentifier IdentifierName
   | SUnaryOp String SurfaceExpr
   | SInfix String SurfaceExpr SurfaceExpr
+  | SParens SurfaceExpr -- needed explicitly for hole lifting rules
   | SLambda IdentifierName SurfaceExpr
   | SApply SurfaceExpr SurfaceExpr
   | SIf SurfaceExpr SurfaceExpr SurfaceExpr
