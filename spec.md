@@ -15,7 +15,8 @@ Weed is statically typed with strict type inference.
 
 The following typeclasses exist:
 - **Functor `Functor d`**: Implemented by `[]`, `Dice`, and `Pool`, provides `fmap` for mapping over values of type `a` in `d a`.
-- **Trackable `Trackable d`**: Implemented by `Dice` and `Pool`, provides `source :: Trackable d => d a -> Dice a` for extracting the original generating dice which extracts the single die which all rolls represented by the value share. For `Dice a`, `source` is the identity. For `Pool a`, `source` tracks the original generating die (for instance, `source 4d6 = d6`.)
+- **Monad `Monad d`**: Implemented by `[]`, `Dice`, and `Pool`, provides `return` and `>>=` for sequencing computations.
+- **Rollable `Rollable d`**: Implemented by `Dice` and `Pool`, provides `source :: Rollable d => d a -> Dice a` for extracting the original generating dice which extracts the single die which all rolls represented by the value share. For `Dice a`, `source` is the identity. For `Pool a`, `source` tracks the original generating die (for instance, `source 4d6 = d6`.)
 
 ## Dice Syntax
 
