@@ -77,7 +77,19 @@ instance PrettyPrintable IdentifierName where
 instance (PrettyPrintable a) => PrettyPrintable [a] where
   prettyPrint xs = "[" ++ intercalate ", " (map prettyPrint xs) ++ "]"
 
--- todo the other expr types
+-- todo surface expr
+
+instance PrettyPrintable CoreUntypedExpr where
+  prettyPrint (CUNumber n) = show n
+  prettyPrint (CUBool b) = show b
+  prettyPrint CUUnit = "()"
+  prettyPrint (CUList xs) = prettyPrint xs
+  prettyPrint (CUIdentifier n) = prettyPrint n
+  prettyPrint (CULambda n e) = "λ" ++ prettyPrint n ++ " -> " ++ prettyPrint e
+  prettyPrint (CUApply e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
+  prettyPrint (CUIf e1 e2 e3) = "if " ++ prettyPrint e1 ++ " then " ++ prettyPrint e2 ++ " else " ++ prettyPrint e3
+  prettyPrint (CULet n e1 e2) = "let " ++ prettyPrint n ++ " = " ++ prettyPrint e1 ++ " in " ++ prettyPrint e2
+
 instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTNumber n) = show n
   prettyPrint (CTBool b) = show b
