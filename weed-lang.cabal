@@ -46,3 +46,4 @@ test-suite test-weed
                     , weed-lang
                     , tasty
                     , tasty-hunit
+    other-modules:    Tests.TypeChecker
