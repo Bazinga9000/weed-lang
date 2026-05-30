@@ -169,6 +169,11 @@ fetchBuiltin Gt = liftRealCmp Gt (>)
 fetchBuiltin And = liftBool2 (&&)
 fetchBuiltin Or = liftBool2 (||)
 fetchBuiltin Xor = liftBool2 (/=)
+fetchBuiltin If = VBuiltin $ \cond -> return $ VBuiltin $ \t -> return $ VBuiltin $ \f -> do
+  cond' <- assertBoolE cond
+  if cond'
+    then return t
+    else return f
 fetchBuiltin Identity = VBuiltin return
 fetchBuiltin Fmap = undefined -- todo: evaluator later, typechecker now
 fetchBuiltin Ap = undefined

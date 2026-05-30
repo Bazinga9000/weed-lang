@@ -35,6 +35,7 @@ data Builtin -- unary operators
     And
   | Or
   | Xor
+  | If
   | -- functor/applicative/monad operations
     Identity
   | Fmap
@@ -81,7 +82,6 @@ data CoreUntypedExpr
   | CUIdentifier IdentifierName
   | CULambda IdentifierName CoreUntypedExpr
   | CUApply CoreUntypedExpr CoreUntypedExpr
-  | CUIf CoreUntypedExpr CoreUntypedExpr CoreUntypedExpr
   | CULet IdentifierName CoreUntypedExpr CoreUntypedExpr
   deriving (Show, Eq)
 
@@ -93,7 +93,6 @@ data CoreTypedExpr
   | CTIdentifier WeedType IdentifierName
   | CTLambda WeedType IdentifierName CoreTypedExpr
   | CTApply WeedType CoreTypedExpr CoreTypedExpr
-  | CTIf WeedType CoreTypedExpr CoreTypedExpr CoreTypedExpr
   | CTLet WeedType IdentifierName CoreTypedExpr CoreTypedExpr
   | CTMapPool WeedType CoreTypedExpr CoreTypedExpr -- Maps ([a] -> b) over Pool a -> Dice b
   deriving (Show, Eq)

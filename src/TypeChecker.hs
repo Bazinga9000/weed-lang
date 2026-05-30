@@ -138,12 +138,27 @@ infer (CUApply f arg) = do
                       else return Nothing
                   _ -> return Nothing
               ]
-            TApp _ (TFunction taInner _) ->
-              [ -- Rule 3b: Implicit Applicative <*>
-                case ta' of
-                  TApp _ taActual -> do
+            TApp tWrapper (TFunction taInner _) ->
+              [ -- Rule 2: Pool Collapse (Applicative)
+                -- f is Dice (a -> b), arg is Pool a
+                case (tWrapper, ta') of
+                  (TDice, TApp TPool taActual) -> do
                     ok <- unifyPeek taInner taActual
                     if ok
+                      then do
+                        unify taInner taActual
+                        (tCollapsed, collapseCall) <- call1 Collapse ta' ca
+                        (tApplicative, applicativeCall) <- call2 Ap tf' cf tCollapsed collapseCall
+                        unify tr tApplicative
+                        return $ Just (tApplicative, applicativeCall)
+                      else return Nothing
+                  _ -> return Nothing,
+                -- Rule 3b: Implicit Applicative <*>
+                case ta' of
+                  TApp targWrapper taActual -> do
+                    ok <- unifyPeek taInner taActual
+                    ok2 <- unifyPeek tWrapper targWrapper
+                    if ok && ok2
                       then do
                         unify taInner taActual
                         (tApplicative, applicativeCall) <- call2 Ap tf' cf ta' ca
@@ -171,13 +186,6 @@ infer (CUApply f arg) = do
       firstJustM rules >>= \case
         Just result -> return result
         Nothing -> throwError origErr
-infer (CUIf cond t f) = do
-  (tc, cc) <- infer cond
-  (tt, ct) <- infer t
-  (tf, cf) <- infer f
-  unify tc TBool
-  unify tt tf
-  return (tt, CTIf tc cc ct cf)
 infer (CULet ident val body) = do
   -- infer the value and trap its class constraints
   ((tVal, typedVal), valConstraints) <- listen $ censor (const []) (infer val)

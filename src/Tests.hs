@@ -3,6 +3,7 @@
 module Main where
 
 import AST
+import AST (Builtin (DiceBinomial), CoreUntypedExpr (CUApply))
 import Test.Tasty
 import Test.Tasty.HUnit
 import TypeChecker
@@ -16,7 +17,6 @@ getType (CTList t _) = t
 getType (CTIdentifier t _) = t
 getType (CTLambda t _ _) = t
 getType (CTApply t _ _) = t
-getType (CTIf t _ _ _) = t
 getType (CTLet t _ _ _) = t
 getType (CTMapPool t _ _) = t
 
@@ -41,6 +41,15 @@ pool4d6 = CUApply (CUApply (CUIdentifier (B Poolify)) (CUNumber 4)) d6
 
 add :: CoreUntypedExpr
 add = CUIdentifier (B Add)
+
+mkIf :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
+mkIf cond t f = CUApply (CUApply (CUApply (CUIdentifier (B If)) cond) t) f
+
+coin :: CoreUntypedExpr
+coin = CUIdentifier (B DiceCoin)
+
+pool4coin :: CoreUntypedExpr
+pool4coin = CUApply (CUApply (CUIdentifier (B Poolify)) (CUNumber 4)) coin
 
 main :: IO ()
 main = defaultMain tests
@@ -84,10 +93,23 @@ tests =
             assertType (CUApply (CUIdentifier (B Sum)) pool4d6) (mkDice TNumber)
         ],
       testGroup
+        "If Expressions"
+        [ testCase "if True then 1 else 2 -> Number (If - Basic)" $
+            assertType (mkIf (CUBool True) (CUNumber 1) (CUNumber 2)) TNumber,
+          testCase "if coin then 1 else 2 -> Dice Number (If - Double Scalar Promotion - Dice)" $
+            assertType (mkIf coin (CUNumber 1) (CUNumber 2)) (mkDice TNumber),
+          testCase "if 4coin then 1 else 2 -> Pool Number (If - Double Scalar Promotion - Pool)" $
+            assertType (mkIf pool4coin (CUNumber 1) (CUNumber 2)) (mkPool TNumber),
+          testCase "if coin then d6 else 0 -> Dice Number (If - One-Sided Scalar Promotion - Dice)" $
+            assertType (mkIf coin d6 (CUNumber 0)) (mkDice TNumber),
+          testCase "if coin then 4d6 else 5 -> Dice Number (If - Simultaneous Promotion / Collapse)" $
+            assertType (mkIf coin pool4d6 (CUNumber 5)) (mkDice TNumber)
+        ],
+      testGroup
         "Type Check Failures"
-        [ testCase "Adding Dice to Bool" $
+        [ testCase "d6 + True -> Type Error" $
             assertTypeError (CUApply (CUApply add d6) (CUBool True)),
-          testCase "If-statement with non-boolean condition" $
-            assertTypeError (CUIf (CUNumber 1) (CUNumber 2) (CUNumber 3))
+          testCase "if 1 then 2 else 3 -> Type Error" $
+            assertTypeError (mkIf (CUNumber 1) (CUNumber 2) (CUNumber 3))
         ]
     ]

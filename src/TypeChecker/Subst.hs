@@ -59,7 +59,6 @@ instance Substitutable CoreTypedExpr where
   apply s (CTIdentifier t ident) = CTIdentifier (apply s t) ident
   apply s (CTLambda t ident body) = CTLambda (apply s t) ident (apply s body)
   apply s (CTApply t a b) = CTApply (apply s t) (apply s a) (apply s b)
-  apply s (CTIf t p te fe) = CTIf (apply s t) (apply s p) (apply s te) (apply s fe)
   apply s (CTLet t ident a b) = CTLet (apply s t) ident (apply s a) (apply s b)
   apply s (CTMapPool t a b) = CTMapPool (apply s t) (apply s a) (apply s b)
 
@@ -70,6 +69,5 @@ instance Substitutable CoreTypedExpr where
   ftv (CTIdentifier t _) = ftv t
   ftv (CTLambda t _ body) = ftv t `Set.union` ftv body
   ftv (CTApply t a b) = ftv t `Set.union` ftv a `Set.union` ftv b
-  ftv (CTIf t p te fe) = ftv t `Set.union` ftv p `Set.union` ftv te `Set.union` ftv fe
   ftv (CTLet t _ a b) = ftv t `Set.union` ftv a `Set.union` ftv b
   ftv (CTMapPool t a b) = ftv t `Set.union` ftv a `Set.union` ftv b

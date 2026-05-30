@@ -55,6 +55,7 @@ instance PrettyPrintable Builtin where
   prettyPrint And = "(&&)"
   prettyPrint Or = "(||)"
   prettyPrint Xor = "xor"
+  prettyPrint If = "if"
   prettyPrint Identity = "id"
   prettyPrint Fmap = "fmap"
   prettyPrint Ap = "ap"
@@ -92,7 +93,6 @@ instance PrettyPrintable CoreUntypedExpr where
   prettyPrint (CUIdentifier n) = prettyPrint n
   prettyPrint (CULambda n e) = "λ" ++ prettyPrint n ++ " -> " ++ prettyPrint e
   prettyPrint (CUApply e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
-  prettyPrint (CUIf e1 e2 e3) = "if " ++ prettyPrint e1 ++ " then " ++ prettyPrint e2 ++ " else " ++ prettyPrint e3
   prettyPrint (CULet n e1 e2) = "let " ++ prettyPrint n ++ " = " ++ prettyPrint e1 ++ " in " ++ prettyPrint e2
 
 instance PrettyPrintable CoreTypedExpr where
@@ -103,7 +103,6 @@ instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTIdentifier t n) = "(" ++ prettyPrint n ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTLambda t ident body) = "(λ" ++ prettyPrint ident ++ "::" ++ prettyPrint t ++ " -> " ++ prettyPrint body ++ ")"
   prettyPrint (CTApply t a b) = "(apply :: " ++ prettyPrint t ++ " " ++ prettyPrint a ++ " " ++ prettyPrint b ++ ")"
-  prettyPrint (CTIf t cond tb fb) = "(if " ++ prettyPrint cond ++ " then " ++ prettyPrint tb ++ " else " ++ prettyPrint fb ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTLet t ident expr body) = "(let " ++ prettyPrint ident ++ " = " ++ prettyPrint expr ++ " in " ++ prettyPrint body ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTMapPool t f pool) = "(map " ++ prettyPrint f ++ " " ++ prettyPrint pool ++ "::" ++ prettyPrint t ++ ")"
 
@@ -160,13 +159,6 @@ displayTypedAST e = unlines $ snd $ runWriter $ runReaderT (mkTree e) 0
       tellAtDepth ["|- application :: " ++ prettyPrint t]
       local (+ 1) (mkTree e1)
       local (+ 1) (mkTree e2)
-    mkTree (CTIf t e1 e2 e3) = do
-      tellAtDepth ["|- if :: " ++ prettyPrint t]
-      local (+ 1) (mkTree e1)
-      tellAtDepth ["|- then"]
-      local (+ 1) (mkTree e2)
-      tellAtDepth ["|- else"]
-      local (+ 1) (mkTree e3)
     mkTree (CTLet t n e1 e2) = do
       tellAtDepth ["|- let " ++ prettyPrint n ++ " :: " ++ prettyPrint t]
       local (+ 1) (mkTree e1)

@@ -36,12 +36,6 @@ eval (CTApply _ func arg) = do
       local (\_ -> captured) $ eval body
     VBuiltin builtin -> builtin arg'
     _ -> throwError $ InterpreterBug "Evaluator got a non-closure function"
-eval (CTIf _ cond t f) = do
-  cond' <- eval cond
-  case cond' of
-    VBool True -> eval t
-    VBool False -> eval f
-    _ -> throwError $ InterpreterBug "Evaluator got a non-boolean condition"
 eval (CTLet _ ident expr body) = do
   expr' <- eval expr
   local (\e -> e `extend` (ident, expr')) $ eval body
