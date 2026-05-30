@@ -46,4 +46,6 @@ test-suite test-weed
                     , weed-lang
                     , tasty
                     , tasty-hunit
+                    , containers
     other-modules:    Tests.TypeChecker
+                    , Tests.Evaluator
