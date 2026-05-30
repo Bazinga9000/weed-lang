@@ -86,7 +86,9 @@ typeCheckerTests =
           testCase "4d6 + 5 -> Dice Number (Pool Collapse & Scalar Promotion)" $
             assertType (CUApply (CUApply add pool4d6) (CUNumber 5)) (mkDice TNumber),
           testCase "4d6 + d10 -> Dice Number (Pool Collapse & Implicit Applicative)" $
-            assertType (CUApply (CUApply add pool4d6) d10) (mkDice TNumber)
+            assertType (CUApply (CUApply add pool4d6) d10) (mkDice TNumber),
+          testCase "4d6 + 4d6 -> Dice Number (Pool Collapse & Implicit Applicative)" $
+            assertType (CUApply (CUApply add pool4d6) pool4d6) (mkDice TNumber)
         ],
       testGroup
         "Pool Operations"
