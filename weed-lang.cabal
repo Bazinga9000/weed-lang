@@ -21,6 +21,7 @@ executable weed
     other-modules:    AST, PrettyPrint,
                       TypeChecker, TypeChecker.Types, TypeChecker.Subst, TypeChecker.BuiltinTypes, TypeChecker.Infer,
                       Evaluator, Evaluator.Types, Evaluator.Builtins, Evaluator.WeedNumber
+    ghc-options:        -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wmissing-home-modules -Widentities -Werror
 
 
 test-suite test-weed
@@ -37,3 +38,4 @@ test-suite test-weed
                     , QuickCheck
                     , tasty
                     , tasty-hunit
+    ghc-options:        -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wmissing-home-modules -Widentities -Werror
