@@ -35,8 +35,11 @@ data Builtin -- unary operators
     And
   | Or
   | Xor
-  | -- identity
+  | -- functor/applicative/monad operations
     Identity
+  | Fmap
+  | Ap
+  | Return
   | -- primitive dice
     DiceD
   | DiceS

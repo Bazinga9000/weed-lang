@@ -45,67 +45,31 @@ liftNumber :: (WeedNumber -> WeedNumber) -> Value
 liftNumber f = VBuiltin $ liftNumber'
   where
     liftNumber' :: Value -> Eval Value
-    liftNumber' (VNumber _) = throwError $ InterpreterBug "automatic number -> dice lifting failed"
-    liftNumber' (VDice d) =
-      return $
-        VDice
-          ( do
-              n <- d >>= assertNumber
-              return $ VNumber (f n)
-          )
-    liftNumber' (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftNumber' e = throwError $ TypeError (mkDice TNumber) e
+    liftNumber' (VNumber n) = return $ VNumber (f n)
+    liftNumber' e = throwError $ TypeError TNumber e
 
 liftBool :: (Bool -> Bool) -> Value
 liftBool f = VBuiltin $ liftBool'
   where
     liftBool' :: Value -> Eval Value
-    liftBool' (VBool _) = throwError $ InterpreterBug "automatic bool -> dice lifting failed"
-    liftBool' (VDice d) =
-      return $
-        VDice
-          ( do
-              b <- d >>= assertBool
-              return $ VBool (f b)
-          )
-    liftBool' (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftBool' e = throwError $ TypeError (mkDice TBool) e
+    liftBool' (VBool b) = return $ VBool (f b)
+    liftBool' e = throwError $ TypeError TBool e
 
 liftNumber2 :: (WeedNumber -> WeedNumber -> WeedNumber) -> Value
 liftNumber2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftNumber2' a b
   where
     liftNumber2' :: Value -> Value -> Eval Value
-    liftNumber2' (VNumber _) _ = throwError $ InterpreterBug "automatic number -> dice lifting failed"
-    liftNumber2' _ (VNumber _) = throwError $ InterpreterBug "automatic number -> dice lifting failed"
-    liftNumber2' (VDice d) (VDice d') =
-      return $
-        VDice
-          ( do
-              n <- d >>= assertNumber
-              n' <- d' >>= assertNumber
-              return $ VNumber (f n n')
-          )
-    liftNumber2' _ (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftNumber2' (VPool _ _) _ = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftNumber2' _ e = throwError $ TypeError (mkDice TNumber) e
+    liftNumber2' (VNumber n) (VNumber n') = return $ VNumber (f n n')
+    liftNumber2' (VNumber _) e = throwError $ TypeError TNumber e
+    liftNumber2' e _ = throwError $ TypeError TNumber e
 
 liftBool2 :: (Bool -> Bool -> Bool) -> Value
 liftBool2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftBool2' a b
   where
     liftBool2' :: Value -> Value -> Eval Value
-    liftBool2' (VNumber _) _ = throwError $ InterpreterBug "automatic number -> dice lifting failed"
-    liftBool2' _ (VNumber _) = throwError $ InterpreterBug "automatic number -> dice lifting failed"
-    liftBool2' (VDice d) (VDice d') =
-      return $
-        VDice
-          ( do
-              n <- d >>= assertBool
-              n' <- d' >>= assertBool
-              return $ VBool (f n n')
-          )
-    liftBool2' _ (VPool _ _) = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftBool2' (VPool _ _) _ = throwError $ InterpreterBug "automatic pool -> dice collapse failed"
-    liftBool2' _ e = throwError $ TypeError (mkDice TBool) e
+    liftBool2' (VBool b) (VBool b') = return $ VBool (f b b')
+    liftBool2' (VBool _) e = throwError $ TypeError TBool e
+    liftBool2' e _ = throwError $ TypeError TBool e
 
 liftRoll2 :: WeedType -> (Roll Value -> Roll Value -> Roll Value) -> Value
 liftRoll2 t f = VBuiltin $ \a -> return $ VBuiltin $ \b -> return $ VDice $ liftRoll2' a b
@@ -176,17 +140,17 @@ fetchBuiltin Not = liftBool not
 fetchBuiltin Add = liftNumber2 (+)
 fetchBuiltin Sub = liftNumber2 (-)
 fetchBuiltin Mul = liftNumber2 (*)
-fetchBuiltin Div = liftRoll2 TNumber $ \d d' -> do
-  n <- d >>= assertNumber
-  n' <- d' >>= assertNumber
+fetchBuiltin Div = liftValue2 $ \d d' -> do
+  n <- assertNumberE d
+  n' <- assertNumberE d'
   if n =~= 0
     then
       throwError DivisionByZero
     else
       return $ VNumber (n / n')
-fetchBuiltin Mod = liftRoll2 TNumber $ \d d' -> do
-  n <- d >>= assertNumber
-  n' <- d' >>= assertNumber
+fetchBuiltin Mod = liftValue2 $ \d d' -> do
+  n <- assertNumberE d
+  n' <- assertNumberE d'
   if n' =~= 0
     then
       throwError DivisionByZero
@@ -206,6 +170,9 @@ fetchBuiltin And = liftBool2 (&&)
 fetchBuiltin Or = liftBool2 (||)
 fetchBuiltin Xor = liftBool2 (/=)
 fetchBuiltin Identity = VBuiltin return
+fetchBuiltin Fmap = undefined -- todo: evaluator later, typechecker now
+fetchBuiltin Ap = undefined
+fetchBuiltin Return = undefined
 -- TODO: dice need criticality
 fetchBuiltin DiceD = onePosIntParam DiceD $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (1, i)
 fetchBuiltin DiceS = VBuiltin $ \n -> do

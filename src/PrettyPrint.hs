@@ -1,6 +1,8 @@
 module PrettyPrint where
 
 import AST
+import Control.Monad.Reader
+import Control.Monad.Writer
 import Data.List (intercalate)
 import Evaluator.Types
 import TypeChecker.Types
@@ -54,6 +56,9 @@ instance PrettyPrintable Builtin where
   prettyPrint Or = "(||)"
   prettyPrint Xor = "xor"
   prettyPrint Identity = "id"
+  prettyPrint Fmap = "fmap"
+  prettyPrint Ap = "ap"
+  prettyPrint Return = "return"
   prettyPrint DiceD = "d"
   prettyPrint DiceS = "s"
   prettyPrint DiceF = "f"
@@ -123,3 +128,51 @@ instance PrettyPrintable EvaluationError where
 instance (PrettyPrintable l, PrettyPrintable r) => PrettyPrintable (Either l r) where
   prettyPrint (Left l) = prettyPrint l
   prettyPrint (Right r) = prettyPrint r
+
+-- tree is a reader int writer [String]
+type Tree a = ReaderT Int (Writer [String]) a
+
+-- depth is the current depth in the tree
+displayTypedAST :: CoreTypedExpr -> String
+displayTypedAST e = unlines $ snd $ runWriter $ runReaderT (mkTree e) 0
+  where
+    printAtDepth :: Int -> String -> String
+    printAtDepth depth s = replicate (depth * 2) ' ' ++ s
+    tellAtDepth :: [String] -> Tree ()
+    tellAtDepth ss = do
+      depth <- ask
+      let indented = map (printAtDepth depth) ss
+      tell indented
+    mkTree :: CoreTypedExpr -> Tree ()
+    mkTree (CTNumber n) = tellAtDepth ["|- " ++ show n ++ " :: Number"]
+    mkTree (CTBool b) = tellAtDepth ["|- " ++ show b ++ " :: Bool"]
+    mkTree (CTUnit) = tellAtDepth ["|- () :: Unit"]
+    mkTree (CTList t es) = do
+      tellAtDepth ["|- " ++ prettyPrint t]
+      let deeper e' = local (+ 1) (mkTree e')
+      _ <- sequence $ map deeper es
+      return ()
+    mkTree (CTIdentifier t n) = tellAtDepth ["|- " ++ prettyPrint n ++ " :: " ++ prettyPrint t]
+    mkTree (CTLambda t n body) = do
+      tellAtDepth ["|- lambda " ++ prettyPrint n ++ " :: " ++ prettyPrint t]
+      local (+ 1) (mkTree body)
+    mkTree (CTApply t e1 e2) = do
+      tellAtDepth ["|- application :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e1)
+      local (+ 1) (mkTree e2)
+    mkTree (CTIf t e1 e2 e3) = do
+      tellAtDepth ["|- if :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e1)
+      tellAtDepth ["|- then"]
+      local (+ 1) (mkTree e2)
+      tellAtDepth ["|- else"]
+      local (+ 1) (mkTree e3)
+    mkTree (CTLet t n e1 e2) = do
+      tellAtDepth ["|- let " ++ prettyPrint n ++ " :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e1)
+      tellAtDepth ["|- in"]
+      local (+ 1) (mkTree e2)
+    mkTree (CTMapPool t e1 e2) = do
+      tellAtDepth ["|- mapPool :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e1)
+      local (+ 1) (mkTree e2)

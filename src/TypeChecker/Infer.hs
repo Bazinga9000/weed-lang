@@ -98,6 +98,12 @@ unify t1 t2 = do
     Left err -> throwError err
     Right cs' -> modify (\s -> s {currentSubst = cs' `compose` cs})
 
+unifyPeek :: WeedType -> WeedType -> Infer Bool
+unifyPeek t1 t2 = do
+  cs <- currentSubst <$> get
+  let unifyResult = unify' (apply cs t1) (apply cs t2)
+  return $ either (const False) (const True) unifyResult
+
 instantiate :: WeedTypeScheme -> Infer WeedType
 instantiate (ForAll as cs t) = do
   as' <- mapM (const fresh) as
@@ -130,3 +136,7 @@ generalize t localConstraints = do
   let (scooped, deferred) = List.partition canScoop localConstraints
   tell deferred
   return $ ForAll genVars scooped t'
+
+firstJustM :: (Monad m) => [m (Maybe a)] -> m (Maybe a)
+firstJustM [] = return Nothing
+firstJustM (m : ms) = m >>= maybe (firstJustM ms) (return . Just)

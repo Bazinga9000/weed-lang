@@ -8,10 +8,10 @@ noPoly :: WeedType -> WeedTypeScheme
 noPoly t = ForAll [] [] t
 
 num1 :: Infer WeedTypeScheme
-num1 = return $ noPoly $ (mkDice TNumber ->> mkDice TNumber)
+num1 = return $ noPoly $ (TNumber ->> TNumber)
 
 num2 :: Infer WeedTypeScheme
-num2 = return $ noPoly $ (mkDice TNumber ->> mkDice TNumber ->> mkDice TNumber)
+num2 = return $ noPoly $ (TNumber ->> TNumber ->> TNumber)
 
 bool1 :: Infer WeedTypeScheme
 bool1 = return $ noPoly $ (TBool ->> TBool)
@@ -56,6 +56,28 @@ builtinType And = bool2
 builtinType Or = bool2
 builtinType Xor = bool2
 builtinType Identity = any1
+builtinType Fmap = do
+  f <- fresh
+  a <- fresh
+  b <- fresh
+  let tf = TVar f
+      ta = TVar a
+      tb = TVar b
+  return $ ForAll [f, a, b] [CInstanceOf CFunctor tf] ((ta ->> tb) ->> TApp tf ta ->> TApp tf tb)
+builtinType Ap = do
+  f <- fresh
+  a <- fresh
+  b <- fresh
+  let tf = TVar f
+      ta = TVar a
+      tb = TVar b
+  return $ ForAll [f, a, b] [CInstanceOf CMonad tf] (TApp tf (ta ->> tb) ->> TApp tf ta ->> TApp tf tb)
+builtinType Return = do
+  f <- fresh
+  a <- fresh
+  let tf = TVar f
+      ta = TVar a
+  return $ ForAll [f, a] [CInstanceOf CMonad tf] (ta ->> TApp tf ta)
 builtinType DiceD = dice1
 builtinType DiceS = do
   tv <- fresh

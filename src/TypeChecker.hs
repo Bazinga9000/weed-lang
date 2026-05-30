@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module TypeChecker where
 
 import AST
@@ -45,48 +47,130 @@ infer (CUApply f arg) = do
 
   tr <- fresh
 
-  -- Grab the current state so we can see the true structural shapes
   s <- currentSubst <$> get
   let tf' = apply s tf
   let ta' = apply s ta
 
-  -- Attempt eager structural unification
-  case unify' tf' (TFunction ta' tr) of
-    -- SUCCESS: Standard application
+  -- Utilities for type coersion
+  -- Peek without modifying the current substitution
+
+  -- Instantiate, bind, and apply a unary builtin
+  let call1 builtin argT argC = do
+        tb <- builtinType builtin >>= instantiate
+        trNew <- fresh
+        unify tb (argT ->> trNew)
+        let builtinNode = (CTIdentifier tb (B builtin))
+        return (trNew, CTApply trNew builtinNode argC)
+
+  -- Instantiate, bind, and apply a binary builtin
+  let call2 builtin argT1 argC1 argT2 argC2 = do
+        tb <- builtinType builtin >>= instantiate
+        tMiddle <- fresh
+        trNew <- fresh
+        unify tb (argT1 ->> tMiddle)
+        unify tMiddle (argT2 ->> trNew)
+        let builtinNode = (CTIdentifier tb (B builtin))
+        let ap1 = (CTApply tMiddle builtinNode argC1)
+        return (trNew, CTApply trNew ap1 argC2)
+
+  -- attempt standard application
+  case unify' tf' (ta' ->> tr) of
     Right newSub -> do
       modify (\curr -> curr {currentSubst = newSub `compose` s})
       return (tr, CTApply tr cf ca)
+    Left origErr -> do
+      -- define all the coersion rules in their priority order
+      let rules = case tf' of
+            TFunction texp tret ->
+              [ -- Rule 1: Pool Mapping
+                case (texp, ta') of
+                  (TApp TList texpInner, TApp TPool taInner) -> do
+                    -- check the unification without actually doing it
+                    ok <- unifyPeek texpInner taInner
+                    if ok
+                      then do
+                        -- if it works, commit
+                        unify texpInner taInner
+                        let mapped = TApp TDice tret
+                        return $ Just (mapped, CTMapPool mapped cf ca)
+                      else
+                        return Nothing
+                  _ -> return Nothing,
+                -- Rule 2: Pool Collapse (Direct)
+                case (texp, ta') of
+                  (TApp TDice TNumber, TApp TPool TNumber) -> do
+                    unify tret tr
+                    (_, collapseCall) <- call1 Collapse ta' ca
+                    return $ Just (tret, CTApply tret cf collapseCall)
+                  _ -> return Nothing,
+                -- Also Rule 2: Pool Collapse (Implicit, 3a)
+                case (texp, ta') of
+                  (TNumber, TApp TPool TNumber) -> do
+                    (tCollapsed, collapseCall) <- call1 Collapse ta' ca
+                    -- immediately wrap in an fmap
+                    (tFMapped, fmapCall) <- call2 Fmap tf' cf tCollapsed collapseCall
+                    unify tr tFMapped
+                    return $ Just (tFMapped, fmapCall)
+                  _ -> return Nothing,
+                -- Rule 3a: Implicit FMap
+                case ta' of
+                  TApp _ taInner -> do
+                    ok <- unifyPeek texp taInner
+                    if ok
+                      then do
+                        unify texp taInner
+                        (tRes, fmapCall) <- call2 Fmap tf' cf ta' ca
+                        unify tr tRes
+                        return $ Just (tRes, fmapCall)
+                      else return Nothing
+                  _ -> return Nothing,
+                -- Rule 4: Scalar Promotion (Direct)
+                case texp of
+                  TApp _ texpInner | not (isDiceOrPool ta') -> do
+                    ok <- unifyPeek texpInner ta'
+                    if ok
+                      then do
+                        unify texp texpInner
+                        (tReturn, returnCall) <- call1 Return ta' ca
+                        unify texp tReturn
+                        unify tr tret
+                        return $ Just (tret, CTApply tret cf returnCall)
+                      else return Nothing
+                  _ -> return Nothing
+              ]
+            TApp _ (TFunction taInner _) ->
+              [ -- Rule 3b: Implicit Applicative <*>
+                case ta' of
+                  TApp _ taActual -> do
+                    ok <- unifyPeek taInner taActual
+                    if ok
+                      then do
+                        unify taInner taActual
+                        (tApplicative, applicativeCall) <- call2 Ap tf' cf ta' ca
+                        unify tr tApplicative
+                        return $ Just (tApplicative, applicativeCall)
+                      else return Nothing
+                  _ -> return Nothing,
+                -- Rule 4: Scalar Promotion (Indirect)
+                case ta' of
+                  _ | not (isDiceOrPool ta') -> do
+                    ok <- unifyPeek taInner ta'
+                    if ok
+                      then do
+                        unify taInner ta'
+                        (tReturn, returnCall) <- call1 Return ta' ca
+                        (tApplicative, applicativeCall) <- call2 Ap tf' cf tReturn returnCall
+                        unify tr tApplicative
+                        return $ Just (tApplicative, applicativeCall)
+                      else return Nothing
+                  _ -> return Nothing
+              ]
+            _ -> []
 
-    -- FAILURE: Intercept the structural mismatch to attempt coercion
-    Left origErr -> case tf' of
-      TFunction texp tret ->
-        case (texp, ta') of
-          -- RULE 2: Pool Collapse (Expected: Dice Number, Actual: Pool Number)
-          (TApp TDice TNumber, TApp TPool TNumber) -> do
-            unify tret tr
-            let tcollapse = TFunction (TApp TPool TNumber) (TApp TDice TNumber)
-            let collapse = CTIdentifier tcollapse (B Collapse)
-            let coerced = CTApply (TApp TDice TNumber) collapse ca
-            return (tret, CTApply tret cf coerced)
-
-          -- RULE 3: Pool Mapping (Expected: [a], Actual: Pool a)
-          (TApp TList texpInner, TApp TPool tInner) -> do
-            unify texpInner tInner
-            let mapped = TApp TDice tret
-            unify tr mapped
-            return (mapped, CTMapPool mapped cf ca)
-
-          -- RULE 1: Scalar Lifting (Expected: Dice a, Actual: a (but NOT a Dice/Pool))
-          (TApp TDice texpInner, tscalar)
-            | not (isDiceOrPool tscalar) -> do
-                unify texpInner tscalar
-                unify tret tr
-                let tconst = TFunction tscalar tret
-                let constNode = CTIdentifier tconst (B Constant)
-                let coercedArg = CTApply texp constNode ca
-                return (tr, CTApply tr cf coercedArg)
-          _ -> throwError origErr
-      _ -> throwError origErr
+      -- try each rule in order. If they all fail, throw the original error.
+      firstJustM rules >>= \case
+        Just result -> return result
+        Nothing -> throwError origErr
 infer (CUIf cond t f) = do
   (tc, cc) <- infer cond
   (tt, ct) <- infer t

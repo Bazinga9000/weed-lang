@@ -137,11 +137,14 @@ When the compiler lowers the surface AST into the core AST, expressions containi
 
 ## Type Coersion
 
-If a function application fails to type-check, WEED will attempt to perform the following three coersions:
+If a function application (or an `if` block, which desugars to application) `f x` fails to type-check, WEED will attempt to perform the following coersions, in order:
 
-1. Scalar Lifting 
-  - If the function expects `Dice a` but receives an `a`, the `a` is lifted to a `Dice a` using `constant :: a -> Dice a`, which produces a deterministic die.
+1. Pool Mapping
+  - If `f :: [a] -> b` and `x :: Pool a`, the type-checker implicitly maps the list function over the pool's generated values, returning `Dice b`.
 2. Pool Collapse
-  - If the function expects `Dice Number` but receives a `Pool Number`, the `Pool` is collapsed to a `Dice Number` using `collapse :: Pool Number -> Dice Number`, which produces a `Dice Number` which "forgets" the source information and is treated as a single die, summing the pool.
-3. Pool Mapping
-  - If a function expects `[a]` but receives `Pool a`, the type-checker implicitly maps the list function over the pool's generated values, returning `Dice b`.
+  - If `f :: Dice Number -> b` or `f :: Number -> b`, and `x :: Pool Number`, the `Pool` is collapsed to a `Dice Number` using `collapse :: Pool Number -> Dice Number`, which produces a `Dice Number` which "forgets" the source information and is treated as a single die, summing the pool.
+3. Implicit Applicative
+  - (a - Implicit `fmap`) If `f :: a -> b` and `x :: Rollable r => r a`, implicitly `fmap` (`fmap :: Functor f => (a -> b) -> f a -> f b`) `f` over `x` to produce `Rollable b`.
+  - (b - Implicit `<*>`) If, for some `Rollable r`, `f :: r (a -> b)` and `x :: r a`, implicitly `<*>` (`<*> :: Applicative f => f (a -> b) -> f a -> f b`) `f` over `x` to produce `r b`.
+4. Scalar Promotion
+  - If, for some `Rollable r`, `f :: r a -> b` and `x :: a`, implicitly lift `x` into a deterministic `r a` using `return`, then *retry step 3b*.
