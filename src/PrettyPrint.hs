@@ -57,9 +57,6 @@ instance PrettyPrintable Builtin where
   prettyPrint Xor = "xor"
   prettyPrint If = "if"
   prettyPrint Identity = "id"
-  prettyPrint Fmap = "fmap"
-  prettyPrint Ap = "ap"
-  prettyPrint Return = "return"
   prettyPrint DiceD = "d"
   prettyPrint DiceS = "s"
   prettyPrint DiceF = "f"
@@ -94,6 +91,10 @@ instance PrettyPrintable CoreUntypedExpr where
   prettyPrint (CULambda n e) = "λ" ++ prettyPrint n ++ " -> " ++ prettyPrint e
   prettyPrint (CUApply e1 e2) = prettyPrint e1 ++ " " ++ prettyPrint e2
   prettyPrint (CULet n e1 e2) = "let " ++ prettyPrint n ++ " = " ++ prettyPrint e1 ++ " in " ++ prettyPrint e2
+  prettyPrint (CUMap e1 e2) = "map " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
+  prettyPrint (CUAp e1 e2) = "ap " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
+  prettyPrint (CUReturn e) = "return " ++ prettyPrint e
+  prettyPrint (CUBind e1 e2) = "bind " ++ prettyPrint e1 ++ " " ++ prettyPrint e2
 
 instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTNumber n) = show n
@@ -105,6 +106,10 @@ instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTApply t a b) = "(apply :: " ++ prettyPrint t ++ " " ++ prettyPrint a ++ " " ++ prettyPrint b ++ ")"
   prettyPrint (CTLet t ident expr body) = "(let " ++ prettyPrint ident ++ " = " ++ prettyPrint expr ++ " in " ++ prettyPrint body ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTMapPool t f pool) = "(map " ++ prettyPrint f ++ " " ++ prettyPrint pool ++ "::" ++ prettyPrint t ++ ")"
+  prettyPrint (CTMap t f e) = "(map " ++ prettyPrint f ++ " " ++ prettyPrint e ++ "::" ++ prettyPrint t ++ ")"
+  prettyPrint (CTAp t f e) = "(ap " ++ prettyPrint f ++ " " ++ prettyPrint e ++ "::" ++ prettyPrint t ++ ")"
+  prettyPrint (CTReturn t e) = "(return " ++ prettyPrint e ++ "::" ++ prettyPrint t ++ ")"
+  prettyPrint (CTBind t e1 e2) = "(bind " ++ prettyPrint e1 ++ " " ++ prettyPrint e2 ++ "::" ++ prettyPrint t ++ ")"
 
 instance PrettyPrintable Value where
   prettyPrint (VNumber n) = show n
@@ -166,5 +171,20 @@ displayTypedAST e = unlines $ snd $ runWriter $ runReaderT (mkTree e) 0
       local (+ 1) (mkTree e2)
     mkTree (CTMapPool t e1 e2) = do
       tellAtDepth ["|- mapPool :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e1)
+      local (+ 1) (mkTree e2)
+    mkTree (CTMap t e1 e2) = do
+      tellAtDepth ["|- map :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e1)
+      local (+ 1) (mkTree e2)
+    mkTree (CTAp t e1 e2) = do
+      tellAtDepth ["|- ap :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e1)
+      local (+ 1) (mkTree e2)
+    mkTree (CTReturn t e') = do
+      tellAtDepth ["|- return :: " ++ prettyPrint t]
+      local (+ 1) (mkTree e')
+    mkTree (CTBind t e1 e2) = do
+      tellAtDepth ["|- bind :: " ++ prettyPrint t]
       local (+ 1) (mkTree e1)
       local (+ 1) (mkTree e2)

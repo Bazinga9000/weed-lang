@@ -3,7 +3,6 @@
 module Main where
 
 import AST
-import AST (Builtin (DiceBinomial), CoreUntypedExpr (CUApply))
 import Test.Tasty
 import Test.Tasty.HUnit
 import TypeChecker
@@ -19,6 +18,10 @@ getType (CTLambda t _ _) = t
 getType (CTApply t _ _) = t
 getType (CTLet t _ _ _) = t
 getType (CTMapPool t _ _) = t
+getType (CTMap t _ _) = t
+getType (CTAp t _ _) = t
+getType (CTBind t _ _) = t
+getType (CTReturn t _) = t
 
 assertType :: CoreUntypedExpr -> WeedType -> Assertion
 assertType expr expectedType = case typeCheck expr of
@@ -50,6 +53,9 @@ coin = CUIdentifier (B DiceCoin)
 
 pool4coin :: CoreUntypedExpr
 pool4coin = CUApply (CUApply (CUIdentifier (B Poolify)) (CUNumber 4)) coin
+
+idX :: IdentifierName
+idX = S "x"
 
 main :: IO ()
 main = defaultMain tests
@@ -104,6 +110,55 @@ tests =
             assertType (mkIf coin d6 (CUNumber 0)) (mkDice TNumber),
           testCase "if coin then 4d6 else 5 -> Dice Number (If - Simultaneous Promotion / Collapse)" $
             assertType (mkIf coin pool4d6 (CUNumber 5)) (mkDice TNumber)
+        ],
+      testGroup
+        "Explicit Monadic Operations (fmap, ap, bind)"
+        [ testCase "map (+5) [1, 2, 3] -> List Number" $
+            assertType
+              (CUMap (CUApply add (CUNumber 5)) (CUList [CUNumber 1, CUNumber 2, CUNumber 3]))
+              (mkList TNumber),
+          testCase "map (+5) d6 -> Dice Number" $
+            assertType
+              (CUMap (CUApply add (CUNumber 5)) d6)
+              (mkDice TNumber),
+          testCase "map (+5) 4d6 -> Pool Number" $
+            assertType
+              (CUMap (CUApply add (CUNumber 5)) pool4d6)
+              (mkPool TNumber),
+          testCase "ap (map (+) d6) d10 -> Dice Number" $
+            assertType
+              (CUAp (CUMap add d6) d10)
+              (mkDice TNumber),
+          testCase "bind d6 (const d10) -> Dice Number" $
+            assertType
+              (CUBind d6 (CULambda idX d10))
+              (mkDice TNumber),
+          testCase "map (+5) 10 -> Type Error" $
+            assertTypeError
+              (CUMap (CUApply add (CUNumber 5)) (CUNumber 10)),
+          testCase "d6 >>= (const 5) -> Type Error" $
+            assertTypeError
+              (CUBind d6 (CULambda idX (CUNumber 5))),
+          testCase
+            "bind (return 5) (\\x -> d6) -> Dice Number"
+            $ assertType
+              (CUBind (CUReturn (CUNumber 5)) (CULambda idX d6))
+              (mkDice TNumber),
+          testCase "bind (return 5) (\\x -> 4d6) -> Pool Number" $
+            assertType
+              (CUBind (CUReturn (CUNumber 5)) (CULambda idX pool4d6))
+              (mkPool TNumber),
+          testCase "ap (return (+5)) d10 -> Dice Number" $
+            assertType
+              (CUAp (CUReturn (CUApply add (CUNumber 5))) d10)
+              (mkDice TNumber),
+          testCase "[return 5, d6] -> List (Dice Number)" $
+            assertType
+              (CUList [CUReturn (CUNumber 5), d6])
+              (mkList (mkDice TNumber)),
+          testCase "return 5 -> Type Error (Contextless return)" $
+            assertTypeError
+              (CUReturn (CUNumber 5))
         ],
       testGroup
         "Type Check Failures"

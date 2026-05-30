@@ -59,28 +59,6 @@ builtinType If = do
   a <- fresh
   return $ ForAll [a] [] (TBool ->> TVar a ->> TVar a ->> TVar a)
 builtinType Identity = any1
-builtinType Fmap = do
-  f <- fresh
-  a <- fresh
-  b <- fresh
-  let tf = TVar f
-      ta = TVar a
-      tb = TVar b
-  return $ ForAll [f, a, b] [CInstanceOf CFunctor tf] ((ta ->> tb) ->> TApp tf ta ->> TApp tf tb)
-builtinType Ap = do
-  f <- fresh
-  a <- fresh
-  b <- fresh
-  let tf = TVar f
-      ta = TVar a
-      tb = TVar b
-  return $ ForAll [f, a, b] [CInstanceOf CMonad tf] (TApp tf (ta ->> tb) ->> TApp tf ta ->> TApp tf tb)
-builtinType Return = do
-  f <- fresh
-  a <- fresh
-  let tf = TVar f
-      ta = TVar a
-  return $ ForAll [f, a] [CInstanceOf CMonad tf] (ta ->> TApp tf ta)
 builtinType DiceD = dice1
 builtinType DiceS = do
   tv <- fresh

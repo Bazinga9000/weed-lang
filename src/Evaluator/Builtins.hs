@@ -175,9 +175,6 @@ fetchBuiltin If = VBuiltin $ \cond -> return $ VBuiltin $ \t -> return $ VBuilti
     then return t
     else return f
 fetchBuiltin Identity = VBuiltin return
-fetchBuiltin Fmap = undefined -- todo: evaluator later, typechecker now
-fetchBuiltin Ap = undefined
-fetchBuiltin Return = undefined
 -- TODO: dice need criticality
 fetchBuiltin DiceD = onePosIntParam DiceD $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (1, i)
 fetchBuiltin DiceS = VBuiltin $ \n -> do

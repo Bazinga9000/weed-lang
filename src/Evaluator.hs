@@ -61,6 +61,10 @@ eval (CTMapPool _ f p) = do
             extract evs
         _ -> throwError $ InterpreterBug "Evaluator got a non-closure function"
     _ -> throwError $ InterpreterBug "Evaluator got a non-pool argument"
+eval (CTMap _ _ _) = undefined
+eval (CTAp _ _ _) = undefined
+eval (CTReturn _ _) = undefined
+eval (CTBind _ _ _) = undefined
 
 evalPreSample :: CoreTypedExpr -> Either EvaluationError Value
 evalPreSample expr = runEval Map.empty $ eval expr

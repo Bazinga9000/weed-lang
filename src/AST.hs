@@ -36,11 +36,8 @@ data Builtin -- unary operators
   | Or
   | Xor
   | If
-  | -- functor/applicative/monad operations
+  | -- identity function
     Identity
-  | Fmap
-  | Ap
-  | Return
   | -- primitive dice
     DiceD
   | DiceS
@@ -71,6 +68,10 @@ data SurfaceExpr
   | SApply SurfaceExpr SurfaceExpr
   | SIf SurfaceExpr SurfaceExpr SurfaceExpr
   | SLet IdentifierName SurfaceExpr SurfaceExpr
+  | SMap SurfaceExpr SurfaceExpr
+  | SAp SurfaceExpr SurfaceExpr
+  | SReturn SurfaceExpr
+  | SBind SurfaceExpr SurfaceExpr
   | SHole
   deriving (Show, Eq)
 
@@ -83,6 +84,11 @@ data CoreUntypedExpr
   | CULambda IdentifierName CoreUntypedExpr
   | CUApply CoreUntypedExpr CoreUntypedExpr
   | CULet IdentifierName CoreUntypedExpr CoreUntypedExpr
+  | -- higher order operations
+    CUMap CoreUntypedExpr CoreUntypedExpr
+  | CUAp CoreUntypedExpr CoreUntypedExpr
+  | CUReturn CoreUntypedExpr
+  | CUBind CoreUntypedExpr CoreUntypedExpr
   deriving (Show, Eq)
 
 data CoreTypedExpr
@@ -95,4 +101,8 @@ data CoreTypedExpr
   | CTApply WeedType CoreTypedExpr CoreTypedExpr
   | CTLet WeedType IdentifierName CoreTypedExpr CoreTypedExpr
   | CTMapPool WeedType CoreTypedExpr CoreTypedExpr -- Maps ([a] -> b) over Pool a -> Dice b
+  | CTMap WeedType CoreTypedExpr CoreTypedExpr
+  | CTAp WeedType CoreTypedExpr CoreTypedExpr
+  | CTReturn WeedType CoreTypedExpr
+  | CTBind WeedType CoreTypedExpr CoreTypedExpr
   deriving (Show, Eq)
