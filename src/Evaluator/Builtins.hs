@@ -36,6 +36,14 @@ assertListE :: Value -> Eval [Value]
 assertListE (VList xs) = return $ xs
 assertListE e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
 
+assertDiceE :: Value -> Eval (Roll Value)
+assertDiceE (VDice r) = return $ r
+assertDiceE e = throwError $ TypeError (TDice) e
+
+assertPoolE :: Value -> Eval (Roll [Value], Roll Value)
+assertPoolE (VPool r s) = return $ (r, s)
+assertPoolE e = throwError $ TypeError (TPool) e
+
 --
 -- Helper functions to lift functions into builtins that automatically lift/collapse into dice expressions.
 -- Type errors should never happen, but if they do, we throw TypeError (which morally is a specific InterpreterBug)

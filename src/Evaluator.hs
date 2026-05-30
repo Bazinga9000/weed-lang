@@ -7,9 +7,23 @@ import qualified Data.Map as Map
 import Evaluator.Builtins
 import Evaluator.Types
 import Evaluator.WeedNumber
+import TypeChecker.Types
 
 runEval :: Env -> Eval a -> Either EvaluationError a
 runEval env ev = let r = runExceptT ev in runReader r env
+
+-- | Applies a VClosure or VBuiltin to an argument in the Eval monad.
+applyValue :: Value -> Value -> Eval Value
+applyValue (VClosure rho ident body) arg =
+  local (\_ -> Map.insert ident arg rho) $ eval body
+applyValue (VBuiltin builtin) arg = builtin arg
+applyValue _ _ = throwError $ InterpreterBug "Tried to apply a non-function"
+
+-- | Executes `applyValue` inside the Roll monad.
+applyValueRoll :: Env -> Value -> Value -> Roll Value
+applyValueRoll env f arg = case runEval env (applyValue f arg) of
+  Left err -> throwError err
+  Right v -> return v
 
 eval :: CoreTypedExpr -> Eval Value
 eval (CTNumber n) = return $ VNumber $ literal n
@@ -45,26 +59,86 @@ eval (CTMapPool _ f p) = do
   case p' of
     VPool pool _ -> do
       env <- ask
-      let extract :: Eval [Value] -> Roll Value
-          extract evs = case runEval env evs of
-            Left err -> throwError err
-            Right vs -> return $ VList vs
-      case f' of
-        VBuiltin builtin -> return $ VDice $ do
-          evs <- (sequence . map builtin) <$> pool
-          extract evs
-        VClosure rho ident body -> do
-          let applyClosure :: Value -> Eval Value
-              applyClosure arg = local (\_ -> Map.insert ident arg rho) $ eval body
-          return $ VDice $ do
-            evs <- (sequence . map applyClosure) <$> pool
-            extract evs
-        _ -> throwError $ InterpreterBug "Evaluator got a non-closure function"
+      return $ VDice $ do
+        rolls <- pool
+        evs <- (sequence . map (applyValueRoll env f')) $ rolls
+        return $ VList evs
     _ -> throwError $ InterpreterBug "Evaluator got a non-pool argument"
-eval (CTMap _ _ _) = undefined
-eval (CTAp _ _ _) = undefined
-eval (CTReturn _ _) = undefined
-eval (CTBind _ _ _) = undefined
+eval (CTMap _ f v) = do
+  f' <- eval f
+  v' <- eval v
+  env <- ask
+
+  case v' of
+    VDice d -> return $ VDice $ d >>= applyValueRoll env f'
+    VList l -> VList <$> mapM (applyValue f') l
+    VPool pool source -> do
+      let mappedPool = pool >>= mapM (applyValueRoll env f')
+      let mappedSource = source >>= applyValueRoll env f'
+      return $ VPool mappedPool mappedSource
+    _ -> throwError $ InterpreterBug "Evaluator got an invalid type for map"
+eval (CTAp t mf ma) = do
+  f' <- eval mf
+  a' <- eval ma
+  env <- ask
+  case t of
+    (TApp TList _) -> do
+      lf <- assertListE f'
+      la <- assertListE a'
+      VList <$> (sequence $ map applyValue lf <*> la)
+    (TApp TDice _) -> do
+      df <- assertDiceE f'
+      da <- assertDiceE a'
+      return $ VDice $ do
+        vf <- df
+        va <- da
+        applyValueRoll env vf va
+    (TApp TPool _) -> do
+      (poolf, sourcef) <- assertPoolE f'
+      (poola, sourcea) <- assertPoolE a'
+      return $
+        VPool
+          ( do
+              pf <- poolf
+              pa <- poola
+              sequence $ map (applyValueRoll env) pf <*> pa
+          )
+          ( do
+              vf <- sourcef
+              va <- sourcea
+              applyValueRoll env vf va
+          )
+    _ -> throwError $ InterpreterBug "Evaluator got an invalid type for ap"
+eval (CTReturn t v) = do
+  v' <- eval v
+  case t of
+    (TApp TDice _) -> return $ VDice $ return v'
+    (TApp TList _) -> return $ VList [v']
+    (TApp TPool _) -> return $ VPool (return . return $ v') (return v')
+    _ -> throwError $ InterpreterBug "Evaluator got an invalid type for return"
+eval (CTBind _ monadArg fnArg) = do
+  m <- eval monadArg
+  f <- eval fnArg
+  env <- ask
+
+  let bindDice :: Roll Value -> Roll Value
+      bindDice d = do
+        v <- d
+        bound <- applyValueRoll env f v
+        case bound of
+          VDice d' -> d'
+          _ -> throwError $ InterpreterBug "Bind returned a non-dice value."
+
+  case m of
+    VList l -> do
+      vs <- sequence $ map (applyValue f) l
+      (VList . concat) <$> mapM assertListE vs
+    VDice d -> return $ VDice $ bindDice d
+    VPool pool source -> do
+      let boundPool = pool >>= mapM (bindDice . return)
+      let boundSource = bindDice source
+      return $ VPool boundPool boundSource
+    _ -> throwError $ InterpreterBug "Bind called on a non-monad"
 
 evalPreSample :: CoreTypedExpr -> Either EvaluationError Value
 evalPreSample expr = runEval Map.empty $ eval expr
