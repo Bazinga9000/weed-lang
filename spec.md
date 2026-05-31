@@ -107,7 +107,7 @@ The metadata inheritance rules for operations are as follows.
 
 ## Holes
 
-WEED supports the use of the underscore `_` as a syntactic hole to automatically generate lambda expressions. Holes are conditionally lifted to the nearest enclosing binary operation block, generating multi-parameter functions ordered from left to right.
+WEED supports the use of the underscore `_` as a syntactic hole to automatically generate lambda expressions. Holes are conditionally lifted to the nearest enclosing binary operation block, generating multi-parameter functions ordered from left to right. Standard lambdas `(\x -> y)` and `(\x y -> z)` are also supported; holes are provided merely for brevity.
 
 ### Lowering Semantics
 
