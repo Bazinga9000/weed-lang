@@ -60,12 +60,14 @@ data SurfaceExpr
   = SNumber Double
   | SBool Bool
   | SUnit
+  | SList [SurfaceExpr]
   | SIdentifier IdentifierName
   | SUnaryOp String SurfaceExpr
   | SInfix String SurfaceExpr SurfaceExpr
   | SParens SurfaceExpr -- needed explicitly for hole lifting rules
   | SLambda IdentifierName SurfaceExpr
   | SApply SurfaceExpr SurfaceExpr
+  | SPipe SurfaceExpr SurfaceExpr -- seperate for hole lifting rules
   | SIf SurfaceExpr SurfaceExpr SurfaceExpr
   | SLet IdentifierName SurfaceExpr SurfaceExpr
   | SMap SurfaceExpr SurfaceExpr
