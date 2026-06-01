@@ -4,7 +4,8 @@ module Main where
 
 import Test.Tasty
 import Tests.Evaluator
+import Tests.Lexer
 import Tests.TypeChecker
 
 main :: IO ()
-main = defaultMain $ testGroup "All Tests" [typeCheckerTests, evaluatorTests]
+main = defaultMain $ testGroup "All Tests" [typeCheckerTests, evaluatorTests, lexerTests]
