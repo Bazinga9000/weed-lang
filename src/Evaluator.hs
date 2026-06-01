@@ -44,12 +44,7 @@ eval (CTLambda _ ident body) = do
 eval (CTApply _ func arg) = do
   func' <- eval func
   arg' <- eval arg
-  case func' of
-    VClosure rho ident body -> do
-      let captured = Map.insert ident arg' rho
-      local (\_ -> captured) $ eval body
-    VBuiltin builtin -> builtin arg'
-    _ -> throwError $ InterpreterBug "Evaluator got a non-closure function"
+  applyValue func' arg'
 eval (CTLet _ ident expr body) = do
   expr' <- eval expr
   local (\e -> e `extend` (ident, expr')) $ eval body
