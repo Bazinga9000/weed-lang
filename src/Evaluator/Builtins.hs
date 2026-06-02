@@ -24,10 +24,6 @@ assertRealE builtin (VNumber wn) = do
   if imag == 0 then return real else throwError $ DomainError builtin
 assertRealE _ e = throwError $ TypeError (TNumber) e
 
-assertBool :: Value -> Roll Bool
-assertBool (VBool b) = return $ b
-assertBool e = throwError $ TypeError (TBool) e
-
 assertBoolE :: Value -> Eval Bool
 assertBoolE (VBool b) = return $ b
 assertBoolE e = throwError $ TypeError (TBool) e
@@ -78,15 +74,6 @@ liftBool2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftBool2' a b
     liftBool2' (VBool b) (VBool b') = return $ VBool (f b b')
     liftBool2' (VBool _) e = throwError $ TypeError TBool e
     liftBool2' e _ = throwError $ TypeError TBool e
-
-liftRoll2 :: WeedType -> (Roll Value -> Roll Value -> Roll Value) -> Value
-liftRoll2 t f = VBuiltin $ \a -> return $ VBuiltin $ \b -> return $ VDice $ liftRoll2' a b
-  where
-    liftRoll2' :: Value -> Value -> Roll Value
-    liftRoll2' (VNumber _) _ = throwError $ InterpreterBug "automatic number -> dice lifting failed"
-    liftRoll2' _ (VNumber _) = throwError $ InterpreterBug "automatic number -> dice lifting failed"
-    liftRoll2' (VDice d) (VDice d') = f d d'
-    liftRoll2' _ e = throwError $ TypeError (mkDice t) e
 
 liftValue2 :: (Value -> Value -> Eval Value) -> Value
 liftValue2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> f a b
