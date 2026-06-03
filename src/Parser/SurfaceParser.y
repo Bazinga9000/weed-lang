@@ -140,6 +140,7 @@ Exp   : let ident '=' Exp in Exp     { SLet (S $2) $4 $6}
       -- todo: implement `subtract` to allow `-` section
       | '(' BinOp Exp ')'            { SInfix $2 SHole $3 }
       | '(' Exp BinOp ')'            { SInfix $3 $2 SHole }
+      | '(' BinOp ')'                { SInfix $2 SHole SHole }
       -- fixity 0
       | Exp '$' Exp                  { SApply $1 $3 }
 
