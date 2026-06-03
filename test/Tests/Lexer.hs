@@ -40,7 +40,7 @@ lexerTests =
         "Monadic Operations"
         [ testCase "Lexes standard monadic functions" $ do
             scanTokens "map ap return bind"
-              @?= [TokenMap, TokenAp, TokenReturn, TokenBind],
+              @?= [TokenIdent "map", TokenIdent "ap", TokenIdent "return", TokenIdent "bind"],
           testCase "Lexes symbolic monadic aliases" $ do
             scanTokens "<$> <*> >>="
               @?= [TokenOp "<$>", TokenOp "<*>", TokenOp ">>="]
@@ -110,7 +110,7 @@ lexerTests =
                     TokenOp "+",
                     TokenHole,
                     TokenIn,
-                    TokenMap,
+                    TokenIdent "map",
                     TokenIdent "add",
                     TokenLBracket,
                     TokenNum 1.0,

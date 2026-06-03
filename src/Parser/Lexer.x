@@ -55,22 +55,12 @@ data Token
   | TokenIdent String
   | TokenOp String
   | TokenBuiltin Builtin
-  | TokenMap
-  | TokenAp
-  | TokenReturn
-  | TokenBind
   deriving (Eq, Show)
 
 -- interceptor pass to make builtins into their proper tokens.
 refineTokens :: [Token] -> [Token]
 refineTokens [] = []
 refineTokens (TokenIdent s : ts) = case s of
-  -- f/a/m operations
-  "map"    -> TokenMap : refineTokens ts
-  "ap"     -> TokenAp : refineTokens ts
-  "return" -> TokenReturn : refineTokens ts
-  "bind"   -> TokenBind : refineTokens ts
-
   -- builtin functions
   -- "keep"   -> TokenBuiltin Keep : refineTokens ts
   -- "drop"   -> TokenBuiltin Drop : refineTokens ts

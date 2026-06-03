@@ -61,10 +61,6 @@ instance Substitutable CoreTypedExpr where
   apply s (CTApply t a b) = CTApply (apply s t) (apply s a) (apply s b)
   apply s (CTLet t ident a b) = CTLet (apply s t) ident (apply s a) (apply s b)
   apply s (CTMapPool t a b) = CTMapPool (apply s t) (apply s a) (apply s b)
-  apply s (CTMap t a b) = CTMap (apply s t) (apply s a) (apply s b)
-  apply s (CTAp t a b) = CTAp (apply s t) (apply s a) (apply s b)
-  apply s (CTReturn t a) = CTReturn (apply s t) (apply s a)
-  apply s (CTBind t a b) = CTBind (apply s t) (apply s a) (apply s b)
 
   ftv (CTNumber _) = Set.empty
   ftv (CTBool _) = Set.empty
@@ -75,7 +71,3 @@ instance Substitutable CoreTypedExpr where
   ftv (CTApply t a b) = ftv t `Set.union` ftv a `Set.union` ftv b
   ftv (CTLet t _ a b) = ftv t `Set.union` ftv a `Set.union` ftv b
   ftv (CTMapPool t a b) = ftv t `Set.union` ftv a `Set.union` ftv b
-  ftv (CTMap t a b) = ftv t `Set.union` ftv a `Set.union` ftv b
-  ftv (CTAp t a b) = ftv t `Set.union` ftv a `Set.union` ftv b
-  ftv (CTReturn t a) = ftv t `Set.union` ftv a
-  ftv (CTBind t a b) = ftv t `Set.union` ftv a `Set.union` ftv b

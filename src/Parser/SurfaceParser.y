@@ -65,12 +65,6 @@ import AST
     -- fixity 0
     '$' { TokenOp "$" }
 
-
-    map { TokenMap }
-    ap { TokenAp }
-    return { TokenReturn }
-    bind { TokenBind }
-
 -- fixity 0
 %right '$'
 -- fixity 1
@@ -127,8 +121,8 @@ Exp   : let ident '=' Exp in Exp     { SLet (S $2) $4 $6}
       -- you know the drill by now
       | Exp '#' Exp                  { SInfix "#" $1 $3 }
       -- fixity 4
-      | Exp '<$>' Exp                { SMap $1 $3 }
-      | Exp '<*>' Exp                { SAp $1 $3 }
+      | Exp '<$>' Exp                { SInfix "<$>" $1 $3 }
+      | Exp '<*>' Exp                { SInfix "<*>" $1 $3 }
       | Exp '==' Exp                 { SInfix "==" $1 $3 }
       | Exp '!=' Exp                 { SInfix "!=" $1 $3 }
       | Exp '>' Exp                  { SInfix ">" $1 $3 }
@@ -140,7 +134,7 @@ Exp   : let ident '=' Exp in Exp     { SLet (S $2) $4 $6}
       -- fixity 2
       | Exp '||' Exp                 { SInfix "||" $1 $3 }
       -- fixity 1
-      | Exp '>>=' Exp                { SBind $1 $3 }
+      | Exp '>>=' Exp                { SInfix ">>=" $1 $3 }
       | Exp '|' Exp                  { SPipe $1 $3 }
       -- sections
       -- todo: implement `subtract` to allow `-` section
@@ -148,11 +142,6 @@ Exp   : let ident '=' Exp in Exp     { SLet (S $2) $4 $6}
       | '(' Exp BinOp ')'            { SInfix $3 $2 SHole }
       -- fixity 0
       | Exp '$' Exp                  { SApply $1 $3 }
-      -- monad words
-      | map Atom Atom                  { SMap $2 $3 }
-      | ap Atom Atom                   { SAp $2 $3 }
-      | return Atom                   { SReturn $2 }
-      | bind Atom Atom                 { SBind $2 $3 }
 
 App   : App Atom                     { SApply $1 $2 }
       | Atom                         { $1 }

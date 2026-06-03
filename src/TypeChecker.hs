@@ -60,7 +60,17 @@ infer (CUApply f arg) = do
         trNew <- fresh
         unify tb (argT ->> trNew)
         let builtinNode = (CTIdentifier tb (B builtin))
-        return $ CTApply trNew builtinNode argC
+        return (trNew, CTApply trNew builtinNode argC)
+
+  let call2 builtin argT1 argC1 argT2 argC2 = do
+        tb <- builtinType builtin >>= instantiate
+        tMiddle <- fresh
+        trNew <- fresh
+        unify tb (argT1 ->> tMiddle)
+        unify tMiddle (argT2 ->> trNew)
+        let builtinNode = (CTIdentifier tb (B builtin))
+        let ap1 = (CTApply tMiddle builtinNode argC1)
+        return (trNew, CTApply trNew ap1 argC2)
 
   -- attempt standard application
   case unify' tf' (ta' ->> tr) of
@@ -90,17 +100,17 @@ infer (CUApply f arg) = do
                 case (texp, ta') of
                   (TApp TDice TNumber, TApp TPool TNumber) -> do
                     unify tret tr
-                    collapseCall <- call1 Collapse ta' ca
+                    (_, collapseCall) <- call1 Collapse ta' ca
                     return $ Just (tret, CTApply tret cf collapseCall)
                   _ -> return Nothing,
                 -- Also Rule 2: Pool Collapse (Implicit, 3a)
                 case (texp, ta') of
                   (TNumber, TApp TPool TNumber) -> do
-                    collapseCall <- call1 Collapse ta' ca
-                    let tFMapped = TApp TDice tret
+                    (tCollapsed, collapseCall) <- call1 Collapse ta' ca
+                    -- immediately wrap in an fmap
+                    (tFMapped, fmapCall) <- call2 Map tf' cf tCollapsed collapseCall
                     unify tr tFMapped
-                    tell [CInstanceOf CFunctor TDice]
-                    return $ Just (tFMapped, CTMap tFMapped cf collapseCall)
+                    return $ Just (tFMapped, fmapCall)
                   _ -> return Nothing,
                 -- Rule 3a: Implicit FMap
                 case ta' of
@@ -109,10 +119,10 @@ infer (CUApply f arg) = do
                     if ok
                       then do
                         unify texp taInner
-                        let tRes = TApp tWrapper tret
-                        unify tr tRes
+                        (tRes, fmapCall) <- call2 Map tf' cf ta' ca
                         tell [CInstanceOf CFunctor tWrapper]
-                        return $ Just (tRes, CTMap tRes cf ca)
+                        unify tr tRes
+                        return $ Just (tRes, fmapCall)
                       else return Nothing
                   _ -> return Nothing,
                 -- Rule 4: Scalar Promotion (Direct)
@@ -121,30 +131,31 @@ infer (CUApply f arg) = do
                     ok <- unifyPeek texpInner ta'
                     if ok
                       then do
-                        unify texpInner ta'
-                        let tPromoted = TApp tWrapper ta'
-                        unify texp tPromoted
+                        unify texp texpInner
+                        (tReturn, returnCall) <- call1 Return ta' ca
+                        unify texp tReturn
                         unify tr tret
-                        let returnNode = CTReturn tPromoted ca
-                        return $ Just (tret, CTApply tret cf returnNode)
+                        tell [CInstanceOf CMonad tWrapper]
+                        return $ Just (tret, CTApply tret cf returnCall)
                       else return Nothing
                   _ -> return Nothing
               ]
             -- f :: m (a -> b) is wrapped
-            TApp tWrapper (TFunction taInner tOut) ->
+            TApp tWrapper (TFunction taInner _) ->
               [ -- Rule 2: Pool Collapse (Applicative)
                 -- f is Dice (a -> b), arg is Pool a
+                --
                 case (tWrapper, ta') of
                   (TDice, TApp TPool taActual) -> do
                     ok <- unifyPeek taInner taActual
                     if ok
                       then do
                         unify taInner taActual
-                        collapseCall <- call1 Collapse ta' ca
-                        let tApplicative = TApp tWrapper tOut
+                        (tCollapsed, collapseCall) <- call1 Collapse ta' ca
+                        (tApplicative, applicativeCall) <- call2 Ap tf' cf tCollapsed collapseCall
                         unify tr tApplicative
-                        tell [CInstanceOf CFunctor tWrapper]
-                        return $ Just (tApplicative, CTAp tApplicative cf collapseCall)
+                        tell [CInstanceOf CMonad tWrapper]
+                        return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing,
                 -- Rule 3b: Implicit Applicative <*>
@@ -155,11 +166,10 @@ infer (CUApply f arg) = do
                     if ok && ok2
                       then do
                         unify taInner taActual
-                        unify tWrapper targWrapper
-                        let tApplicative = TApp tWrapper tOut
+                        (tApplicative, applicativeCall) <- call2 Ap tf' cf ta' ca
                         unify tr tApplicative
-                        tell [CInstanceOf CFunctor tWrapper]
-                        return $ Just (tApplicative, CTAp tApplicative cf ca)
+                        tell [CInstanceOf CMonad tWrapper]
+                        return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing,
                 -- Rule 4: Scalar Promotion (Indirect)
@@ -169,12 +179,11 @@ infer (CUApply f arg) = do
                     if ok
                       then do
                         unify taInner ta'
-                        let tPromoted = TApp tWrapper ta'
-                        let returnNode = CTReturn tPromoted ca
-                        let tApplicative = TApp tWrapper tOut
+                        (tReturn, returnCall) <- call1 Return ta' ca
+                        (tApplicative, applicativeCall) <- call2 Ap tf' cf tReturn returnCall
                         unify tr tApplicative
-                        tell [CInstanceOf CFunctor tWrapper]
-                        return $ Just (tApplicative, CTAp tApplicative cf returnNode)
+                        tell [CInstanceOf CMonad tWrapper]
+                        return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing
               ]
@@ -194,51 +203,6 @@ infer (CULet ident val body) = do
   -- extend the environment and infer the body
   (tBody, typedBody) <- inEnv (ident, scheme) (infer body)
   return (tBody, CTLet tBody ident typedVal typedBody)
-infer (CUMap f x) = do
-  (tf, cf) <- infer f
-  (tx, cx) <- infer x
-
-  tWrapper <- fresh
-  tIn <- fresh
-  tOut <- fresh
-
-  unify tx (TApp tWrapper tIn)
-  unify tf (TFunction tIn tOut)
-  tell [CInstanceOf CFunctor tWrapper]
-  let tRes = TApp tWrapper tOut
-  return (tRes, CTMap tRes cf cx)
-infer (CUAp f x) = do
-  (tf, cf) <- infer f
-  (tx, cx) <- infer x
-
-  tWrapper <- fresh
-  tIn <- fresh
-  tOut <- fresh
-
-  unify tf (TApp tWrapper (TFunction tIn tOut))
-  unify tx (TApp tWrapper tIn)
-  tell [CInstanceOf CFunctor tWrapper] -- NB: if we ever implement non-Applicative functors, this needs to change to CApplicative
-  let tRes = TApp tWrapper tOut
-  return (tRes, CTAp tRes cf cx)
-infer (CUBind m f) = do
-  (tm, cm) <- infer m
-  (tf, cf) <- infer f
-
-  tWrapper <- fresh
-  tIn <- fresh
-  tOut <- fresh
-
-  unify tm (TApp tWrapper tIn)
-  unify tf (TFunction tIn (TApp tWrapper tOut))
-  tell [CInstanceOf CMonad tWrapper]
-  let tRes = TApp tWrapper tOut
-  return (tRes, CTBind tRes cm cf)
-infer (CUReturn x) = do
-  (tx, cx) <- infer x
-  tWrapper <- fresh
-  let tRes = TApp tWrapper tx
-  tell [CInstanceOf CMonad tWrapper]
-  return (tRes, CTReturn tRes cx)
 
 -- solve the constraints generated by infer
 solve :: Subst -> [TypeConstraint] -> Either TypeError ()

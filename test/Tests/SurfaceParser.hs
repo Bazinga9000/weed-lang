@@ -11,6 +11,9 @@ import Test.Tasty.HUnit
 parse :: [Token] -> SurfaceExpr
 parse = parseSurface
 
+sMap :: SurfaceExpr -> SurfaceExpr -> SurfaceExpr
+sMap f x = SApply (SApply (SIdentifier (S "map")) f) x
+
 surfaceParserTests :: TestTree
 surfaceParserTests =
   testGroup
@@ -74,10 +77,10 @@ surfaceParserTests =
         "Monadic Operations"
         [ testCase "x >>= f - Parses bind operator" $
             parse [TokenIdent "x", TokenOp ">>=", TokenIdent "f"]
-              @?= SBind (SIdentifier (S "x")) (SIdentifier (S "f")),
+              @?= SInfix ">>=" (SIdentifier (S "x")) (SIdentifier (S "f")),
           testCase "map f [1] - Parses explicit map word" $
-            parse [TokenMap, TokenIdent "f", TokenLBracket, TokenNum 1.0, TokenRBracket]
-              @?= SMap (SIdentifier (S "f")) (SList [SNumber 1.0])
+            parse [TokenIdent "map", TokenIdent "f", TokenLBracket, TokenNum 1.0, TokenRBracket]
+              @?= sMap (SIdentifier (S "f")) (SList [SNumber 1.0])
         ],
       testGroup
         "Functions and Pipes"

@@ -1,9 +1,13 @@
-module Evaluator.Builtins where
+module Evaluator.Builtins (fetchBuiltin) where
 
 import AST
 import Control.Monad
 import Control.Monad.Except
+import Control.Monad.Reader
 import Data.Complex
+-- TODO: this is a cyclic dependency, but only because of the monads needing access to `eval`, `applyValue`, `applyValueRoll`import Evaluator
+-- figure out a way to clean this up later
+import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Test.QuickCheck.Gen
@@ -128,14 +132,26 @@ oneDoubleParam b f = VBuiltin $ \n -> do
   n' <- assertRealE b n
   (return . VDice . liftGen . f) n'
 
+---
+--- Monad Helpers
+---
+
+fetchOutputType1 :: WeedType -> Eval WeedType
+fetchOutputType1 (TFunction _ t) = return t
+fetchOutputType1 _ = throwError $ InterpreterBug "fetchOutputType1 got an invalid type"
+
+fetchOutputType2 :: WeedType -> Eval WeedType
+fetchOutputType2 (TFunction _ (TFunction _ t)) = return t
+fetchOutputType2 _ = throwError $ InterpreterBug "fetchOutputType2 got an invalid type"
+
 -- the bigass match
-fetchBuiltin :: Builtin -> Value
-fetchBuiltin Negate = liftNumber (\n -> -n)
-fetchBuiltin Not = liftBool not
-fetchBuiltin Add = liftNumber2 (+)
-fetchBuiltin Sub = liftNumber2 (-)
-fetchBuiltin Mul = liftNumber2 (*)
-fetchBuiltin Div = liftValue2 $ \d d' -> do
+fetchBuiltin :: WeedType -> Builtin -> Value
+fetchBuiltin _ Negate = liftNumber (\n -> -n)
+fetchBuiltin _ Not = liftBool not
+fetchBuiltin _ Add = liftNumber2 (+)
+fetchBuiltin _ Sub = liftNumber2 (-)
+fetchBuiltin _ Mul = liftNumber2 (*)
+fetchBuiltin _ Div = liftValue2 $ \d d' -> do
   n <- assertNumberE d
   n' <- assertNumberE d'
   if n =~= 0
@@ -143,7 +159,7 @@ fetchBuiltin Div = liftValue2 $ \d d' -> do
       throwError DivisionByZero
     else
       return $ VNumber (n / n')
-fetchBuiltin Mod = liftValue2 $ \d d' -> do
+fetchBuiltin _ Mod = liftValue2 $ \d d' -> do
   n <- assertNumberE d
   n' <- assertNumberE d'
   if n' =~= 0
@@ -151,45 +167,118 @@ fetchBuiltin Mod = liftValue2 $ \d d' -> do
       throwError DivisionByZero
     else
       return $ VNumber (n `wnMod` n')
-fetchBuiltin Pow = liftNumber2 (**)
-fetchBuiltin Floor = liftNumber wnFloor
-fetchBuiltin Ceil = liftNumber wnCeil
-fetchBuiltin Eq = liftValue2 equality
-fetchBuiltin Neq =
+fetchBuiltin _ Pow = liftNumber2 (**)
+fetchBuiltin _ Floor = liftNumber wnFloor
+fetchBuiltin _ Ceil = liftNumber wnCeil
+fetchBuiltin _ Eq = liftValue2 equality
+fetchBuiltin _ Neq =
   liftValue2 $ \a b -> VBool . not <$> ((equality a b) >>= assertBoolE)
-fetchBuiltin Le = liftRealCmp Le (<=)
-fetchBuiltin Lt = liftRealCmp Lt (<)
-fetchBuiltin Ge = liftRealCmp Ge (>=)
-fetchBuiltin Gt = liftRealCmp Gt (>)
-fetchBuiltin And = liftBool2 (&&)
-fetchBuiltin Or = liftBool2 (||)
-fetchBuiltin Xor = liftBool2 (/=)
-fetchBuiltin If = VBuiltin $ \cond -> return $ VBuiltin $ \t -> return $ VBuiltin $ \f -> do
+fetchBuiltin _ Le = liftRealCmp Le (<=)
+fetchBuiltin _ Lt = liftRealCmp Lt (<)
+fetchBuiltin _ Ge = liftRealCmp Ge (>=)
+fetchBuiltin _ Gt = liftRealCmp Gt (>)
+fetchBuiltin _ And = liftBool2 (&&)
+fetchBuiltin _ Or = liftBool2 (||)
+fetchBuiltin _ Xor = liftBool2 (/=)
+fetchBuiltin _ If = VBuiltin $ \cond -> return $ VBuiltin $ \t -> return $ VBuiltin $ \f -> do
   cond' <- assertBoolE cond
   if cond'
     then return t
     else return f
-fetchBuiltin Identity = VBuiltin return
+fetchBuiltin _ Identity = VBuiltin return
+fetchBuiltin _ Map = VBuiltin $ \f -> return $ VBuiltin $ \v -> do
+  env <- ask
+
+  -- map doesn't actually need to know its output type, it can be determined from the input type
+  case v of
+    VDice d -> return $ VDice $ d >>= applyValueRoll env f
+    VList l -> VList <$> mapM (applyValue f) l
+    VPool pool source -> do
+      let mappedPool = pool >>= mapM (applyValueRoll env f)
+      let mappedSource = source >>= applyValueRoll env f
+      return $ VPool mappedPool mappedSource
+    _ -> throwError $ InterpreterBug "Evaluator got an invalid type for map"
+fetchBuiltin apt Ap = VBuiltin $ \mf -> return $ VBuiltin $ \ma -> do
+  env <- ask
+  t <- fetchOutputType2 apt
+  case t of
+    (TApp TList _) -> do
+      lf <- assertListE mf
+      la <- assertListE mf
+      VList <$> (sequence $ map applyValue lf <*> la)
+    (TApp TDice _) -> do
+      df <- assertDiceE mf
+      da <- assertDiceE ma
+      return $ VDice $ do
+        vf <- df
+        va <- da
+        applyValueRoll env vf va
+    (TApp TPool _) -> do
+      (poolf, sourcef) <- assertPoolE mf
+      (poola, sourcea) <- assertPoolE ma
+      return $
+        VPool
+          ( do
+              pf <- poolf
+              pa <- poola
+              sequence $ map (applyValueRoll env) pf <*> pa
+          )
+          ( do
+              vf <- sourcef
+              va <- sourcea
+              applyValueRoll env vf va
+          )
+    _ -> throwError $ InterpreterBug "Evaluator got an invalid type for ap"
+fetchBuiltin rett Return = VBuiltin $ \v -> do
+  t <- fetchOutputType1 rett
+  case t of
+    (TApp TDice _) -> return $ VDice $ return v
+    (TApp TList _) -> return $ VList [v]
+    (TApp TPool _) -> return $ VPool (return . return $ v) (return v)
+    _ -> throwError $ InterpreterBug "Evaluator got an invalid type for return"
+fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
+  env <- ask
+
+  let bindDice :: Roll Value -> Roll Value
+      bindDice d = do
+        v <- d
+        bound <- applyValueRoll env f v
+        case bound of
+          VDice d' -> d'
+          _ -> throwError $ InterpreterBug "Bind returned a non-dice value."
+
+  -- bind, like map, can inspect its input type
+  case m of
+    VList l -> do
+      vs <- sequence $ map (applyValue f) l
+      (VList . concat) <$> mapM assertListE vs
+    VDice d -> return $ VDice $ bindDice d
+    VPool pool source -> do
+      let boundPool = pool >>= mapM (bindDice . return)
+      let boundSource = bindDice source
+      return $ VPool boundPool boundSource
+    _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" ++ displayObservable m ++ ">>=" ++ displayObservable f ++ ")"
+
 -- TODO: dice need criticality
-fetchBuiltin DiceD = onePosIntParam DiceD $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (1, i)
-fetchBuiltin DiceS = VBuiltin $ \n -> do
+fetchBuiltin _ DiceD = onePosIntParam DiceD $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (1, i)
+fetchBuiltin _ DiceS = VBuiltin $ \n -> do
   n' <- assertListE n
   case n' of
     [] -> throwError $ BadDieParameter DiceS "expected a non-empty list" n
     _ -> (return . VDice . liftGen . elements) n'
-fetchBuiltin DiceF = onePosIntParam DiceF $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (-i, i)
-fetchBuiltin DiceU = oneDoubleParam DiceU $ \i -> (VNumber . literal) <$> choose (0.0, i)
-fetchBuiltin DiceGauss = oneDoubleParam DiceGauss $ \n ->
+fetchBuiltin _ DiceF = onePosIntParam DiceF $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (-i, i)
+fetchBuiltin _ DiceU = oneDoubleParam DiceU $ \i -> (VNumber . literal) <$> choose (0.0, i)
+fetchBuiltin _ DiceGauss = oneDoubleParam DiceGauss $ \n ->
   (VNumber . literal) <$> do
     u1 <- choose (0.0, 1.0)
     u2 <- choose (0.0, 1.0)
     let z = sqrt (-2.0 * log u1) * cos (2.0 * pi * u2)
     return $ n * z
-fetchBuiltin DicePareto = oneDoubleParam DicePareto $ \n ->
+fetchBuiltin _ DicePareto = oneDoubleParam DicePareto $ \n ->
   (VNumber . literal) <$> do
     u <- choose (0.0, 1.0)
     return $ u ** (1.0 / n)
-fetchBuiltin DiceBinomial = VBuiltin $ \n -> return $ VBuiltin $ \p -> do
+fetchBuiltin _ DiceBinomial = VBuiltin $ \n -> return $ VBuiltin $ \p -> do
   n' <- assertRealE DiceBinomial n
   p' <- assertRealE DiceBinomial p
 
@@ -204,23 +293,23 @@ fetchBuiltin DiceBinomial = VBuiltin $ \n -> return $ VBuiltin $ \p -> do
       where
         intliteral :: Int -> WeedNumber
         intliteral = literal . fromIntegral
-fetchBuiltin DiceCoin = VDice $ liftGen $ elements [VBool True, VBool False]
-fetchBuiltin DiceCircle = oneDoubleParam DiceCircle $ \r -> do
+fetchBuiltin _ DiceCoin = VDice $ liftGen $ elements [VBool True, VBool False]
+fetchBuiltin _ DiceCircle = oneDoubleParam DiceCircle $ \r -> do
   theta <- choose (0.0, 2.0 * pi)
   return . VNumber $ complexLiteral (r * cos theta) (r * sin theta)
-fetchBuiltin Constant = VBuiltin $ return . VDice . liftGen . return
-fetchBuiltin Collapse = VBuiltin $ collapse
+fetchBuiltin _ Constant = VBuiltin $ return . VDice . liftGen . return
+fetchBuiltin _ Collapse = VBuiltin $ collapse
   where
     collapse :: Value -> Eval Value
     collapse (VPool pool _) = return $ VDice $ (VNumber . sum) <$> (pool >>= (mapM assertNumber))
     collapse e = throwError $ TypeError (mkPool TNumber) e
-fetchBuiltin Source = VBuiltin $ source
+fetchBuiltin _ Source = VBuiltin $ source
   where
     source :: Value -> Eval Value
     source (VDice d) = return $ VDice d
     source (VPool _ s) = return $ VDice s
     source e = throwError $ TypeError (mkPool TNumber) e -- again, this typeerror's type is morally wrong, but the typechecker should catch this
-fetchBuiltin Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
+fetchBuiltin _ Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
   where
     poolify :: Value -> Value -> Eval Value
     poolify v@(VNumber _) (VDice d) = do
@@ -233,6 +322,6 @@ fetchBuiltin Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
             else return $ VPool (replicateM count d) d
     poolify (VNumber _) e = throwError $ TypeError (mkDice TNumber) e
     poolify n _ = throwError $ TypeError TNumber n
-fetchBuiltin Sum = VBuiltin $ \xs -> do
+fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertListE xs
   VNumber . sum <$> (mapM assertNumberE xs')

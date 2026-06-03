@@ -58,20 +58,26 @@ evaluatorTests =
     [ testGroup
         "Monadic Operations (List)"
         [ testCase "return 5 -> [5] (return explicitly typed as Number -> List Number)" $ do
-            let expr = CTReturn tListNum (cNum 5)
+            let returnE = CTIdentifier (tNum ->> tListNum) (B Return)
+            let expr = CTApply tListNum returnE (cNum 5)
             assertEval expr (VList [vNum 5]),
           testCase "fmap (const 99) [1, 2] -> [99, 99]" $ do
             let listArg = CTList tListNum [cNum 1, cNum 2]
             let mapFunc = CTLambda (TFunction TNumber TNumber) idX (cNum 99)
-            let expr = CTMap tListNum mapFunc listArg
+            let mapE = CTIdentifier ((tNum ->> tNum) ->> tListNum ->> tListNum) (B Map)
+            let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) mapE mapFunc) listArg
             assertEval expr (VList [vNum 99, vNum 99]),
           testCase "[const 8, const 9] <*> [1, 2] -> [8, 8, 9, 9]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
+
+            let lFuncT = TApp TList (TFunction TNumber TNumber)
+
             let func1 = CTLambda (TFunction TNumber TNumber) idX (cNum 8)
             let func2 = CTLambda (TFunction TNumber TNumber) idX (cNum 9)
-            let listFuncs = CTList (TApp TList (TFunction TNumber TNumber)) [func1, func2]
+            let listFuncs = CTList lFuncT [func1, func2]
 
-            let expr = CTAp tListNum listFuncs listArgs
+            let apE = CTIdentifier (lFuncT ->> tListNum ->> tListNum) (B Ap)
+            let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) apE listFuncs) listArgs
             assertEval expr (VList [vNum 8, vNum 8, vNum 9, vNum 9]),
           testCase "[1, 2] >>= \\x -> [x, x] -> [1, 1, 2, 2]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
@@ -86,7 +92,9 @@ evaluatorTests =
                         ]
                     )
 
-            let expr = CTBind tListNum listArgs bindFunc
+            let bindT = tListNum ->> (tNum ->> tListNum) ->> tListNum
+            let bindE = CTIdentifier bindT (B Bind)
+            let expr = CTApply tListNum (CTApply bindT bindE listArgs) bindFunc
             assertEval expr (VList [vNum 1, vNum 1, vNum 2, vNum 2])
         ],
       testGroup
