@@ -118,6 +118,7 @@ When the compiler lowers the surface AST into the core AST, expressions containi
    - **Pipe Limb:** The expressions on either side of a pipe.
    - **Let Body:** The expression after `=` in a `let` binding.
    - **List Literal:** The expressions inside a list literal `[..]`.
+   - **Lambda Body:** The body of a lambda `\x -> ...`
 2. **Left-to-Right Binding**: Within a lifting boundary, the expression tree is traversed in pre-order (left-to-right). Each encountered `_` is replaced by a unique, freshly generated variable name (guaranteed to differ from all others).
 3. **Lambda Wrap**: The entire binary operation subtree is then wrapped in a nested series of lambda expressions binding those variables in the order they were discovered. Consequently, the leftmost hole becomes the outermost argument of the resulting function.
 4. **Boundary Isolation via Pipes**: Pipes act as structural barriers. Holes never lift beyond a pipe.
