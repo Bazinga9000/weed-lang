@@ -43,6 +43,7 @@ executable weed
                     , weed-lang
 
 test-suite test-weed
+    import:           warnings
     type:             exitcode-stdio-1.0
     main-is:          Tests.hs
     hs-source-dirs:   test
@@ -53,5 +54,6 @@ test-suite test-weed
                     , tasty-hunit
                     , containers
     other-modules:    Tests.Lexer
+                    , Tests.SurfaceParser
                     , Tests.TypeChecker
                     , Tests.Evaluator
