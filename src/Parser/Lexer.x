@@ -93,6 +93,8 @@ refineTokens (TokenIdent s : ts) = case s of
       TokenBuiltin DicePareto : TokenNum (read rest) : refineTokens ts
   ('b':'i':'n':'o':'m':'i':'a':'l':rest) | not (null rest) && all isDigit rest ->
       TokenBuiltin DiceBinomial : TokenNum (read rest) : refineTokens ts
+  ('c':'i':'r':'c':'l':'e':rest) | not (null rest) && all isDigit rest ->
+      TokenBuiltin DiceCircle : TokenNum (read rest) : refineTokens ts
 
   -- just an identifier
   _        -> TokenIdent s : refineTokens ts

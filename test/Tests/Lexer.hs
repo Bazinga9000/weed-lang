@@ -85,6 +85,7 @@ lexerTests =
             scanTokens "18f3" @?= [TokenNum 18.0, TokenBuiltin DiceF, TokenNum 3.0]
             scanTokens "gauss7" @?= [TokenBuiltin DiceGauss, TokenNum 7.0]
             scanTokens "pareto5" @?= [TokenBuiltin DicePareto, TokenNum 5.0]
+            scanTokens "7circle1" @?= [TokenNum 7.0, TokenBuiltin DiceCircle, TokenNum 1.0]
         ],
       testGroup
         "Complex Combinations"
