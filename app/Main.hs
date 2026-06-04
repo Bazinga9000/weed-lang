@@ -21,14 +21,13 @@ repl :: String -> IO ()
 repl input = do
   let toks = scanTokens input
   let surface = parseSurface toks
-  let coreu = case lower surface of
-        (Right cue) -> cue
-        (Left e) -> error $ show e
-  let coret = case typeCheck coreu of
-        (Right cte) -> cte
-        (Left e) -> error $ show e
 
-  ev <- evaluate coret
-  case ev of
-    (Right v) -> putStrLn $ displayObservable v
-    (Left err) -> error $ displayError err
+  case lower surface of
+    Left e -> putStrLn $ "Lowering error: " ++ show e
+    Right coreu -> case typeCheck coreu of
+      Left e -> putStrLn $ "Type error: " ++ show e
+      Right coret -> do
+        ev <- evaluate coret
+        case ev of
+          Left err -> putStrLn $ "Evaluation error: " ++ displayError err
+          Right v -> putStrLn $ displayObservable v
