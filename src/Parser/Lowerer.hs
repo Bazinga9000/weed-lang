@@ -16,6 +16,44 @@ data LoweringError
 type Lower = Either LoweringError
 
 ---
+-- Primitive Pool desugaring
+-- converts concatenated dice pools into Poolify infixes
+-- 4d6 -> 4 # d6
+---
+
+isBuiltinDie :: IdentifierName -> Bool
+isBuiltinDie (B DiceD) = True
+isBuiltinDie (B DiceS) = True
+isBuiltinDie (B DiceF) = True
+isBuiltinDie (B DiceU) = True
+isBuiltinDie (B DiceGauss) = True
+isBuiltinDie (B DicePareto) = True
+isBuiltinDie (B DiceBinomial) = True
+isBuiltinDie (B DiceCoin) = True
+isBuiltinDie (B DiceCircle) = True
+isBuiltinDie _ = False
+
+desugarPoolify :: SurfaceExpr -> SurfaceExpr
+desugarPoolify e@(SApply (SApply (SNumber n) (SIdentifier i)) (SNumber p))
+  | isBuiltinDie i = SInfix "#" (SNumber n) (SApply (SIdentifier i) (SNumber p))
+  | otherwise = e -- errors in typechecker, but that's not the lowerer's problem
+desugarPoolify (SApply (SNumber n) (SIdentifier (B DiceCoin))) = SInfix "#" (SNumber n) (SIdentifier (B DiceCoin)) -- special case for the only nullary primitive die DiceCoin
+desugarPoolify (SNumber n) = SNumber n
+desugarPoolify (SBool b) = SBool b
+desugarPoolify SUnit = SUnit
+desugarPoolify (SList es) = SList $ map desugarPoolify es
+desugarPoolify (SIdentifier i) = SIdentifier i
+desugarPoolify (SUnaryOp s e') = SUnaryOp s $ desugarPoolify e'
+desugarPoolify (SInfix s e1 e2) = SInfix s (desugarPoolify e1) (desugarPoolify e2)
+desugarPoolify (SParens e') = SParens $ desugarPoolify e'
+desugarPoolify (SLambda ident body) = SLambda ident (desugarPoolify body)
+desugarPoolify (SApply e1 e2) = SApply (desugarPoolify e1) (desugarPoolify e2)
+desugarPoolify (SPipe e1 e2) = SPipe (desugarPoolify e1) (desugarPoolify e2)
+desugarPoolify (SIf c t f) = SIf (desugarPoolify c) (desugarPoolify t) (desugarPoolify f)
+desugarPoolify (SLet ident binding body) = SLet ident (desugarPoolify binding) (desugarPoolify body)
+desugarPoolify SHole = SHole
+
+---
 -- Hole Lifting
 -- converts holes into lambdas according to the spec's rules
 -- no holes remain in the AST after this
@@ -225,4 +263,4 @@ dissolveOps (SLet ident binding body) = liftA2 (CULet ident) (dissolveOps bindin
 dissolveOps SHole = Left $ InterpreterBug "Hole survived hole resolution"
 
 lower :: SurfaceExpr -> Lower CoreUntypedExpr
-lower e = liftHoles e >>= resolveBuiltins >>= dissolveOps
+lower e = liftHoles (desugarPoolify e) >>= resolveBuiltins >>= dissolveOps

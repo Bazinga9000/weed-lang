@@ -31,6 +31,23 @@ cbId = CUIdentifier . B
 cApp :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
 cApp = CUApply
 
+testDesugarPoolify :: TestTree
+testDesugarPoolify =
+  let mkIn x d y = SApply (SApply (SNumber x) (SIdentifier (B d))) (SNumber y)
+      mkOut x d y = SInfix "#" (SNumber x) (SApply (SIdentifier (B d)) (SNumber y))
+      check x d y = desugarPoolify (mkIn x d y) @?= mkOut x d y
+   in testGroup
+        "desguarPoolify (XdY -> X # dY)"
+        [ testCase "7d6 -> 7 # d6" $
+            check 7 DiceD 6,
+          testCase "7gauss4.5 -> 7 # gauss4.5" $
+            check 7 DiceGauss 4.5,
+          testCase "8coin -> 8 # coin" $
+            let inp = SApply (SNumber 8) (SIdentifier (B DiceCoin))
+                outp = SInfix "#" (SNumber 8) (SIdentifier (B DiceCoin))
+             in desugarPoolify inp @?= outp
+        ]
+
 testHoleLifting :: TestTree
 testHoleLifting =
   testGroup
@@ -133,7 +150,8 @@ lowererTests :: TestTree
 lowererTests =
   testGroup
     "Lowerer Tests"
-    [ testHoleLifting,
+    [ testDesugarPoolify,
+      testHoleLifting,
       testBuiltinResolution,
       testOperatorDissolving,
       testEndToEndLowering
