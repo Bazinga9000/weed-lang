@@ -24,6 +24,7 @@ library
                     , PrettyPrint
                     , Parser.Lexer
                     , Parser.SurfaceParser
+                    , Parser.Lowerer
                     , TypeChecker
                     , TypeChecker.Types
                     , TypeChecker.Subst
@@ -55,5 +56,6 @@ test-suite test-weed
                     , containers
     other-modules:    Tests.Lexer
                     , Tests.SurfaceParser
+                    , Tests.Lowerer
                     , Tests.TypeChecker
                     , Tests.Evaluator
