@@ -56,8 +56,7 @@ eval (CTMapPool _ f p) = do
       env <- ask
       return $ VDice $ do
         rolls <- pool
-        evs <- mapM (applyValueRoll env f') rolls
-        return $ VList evs
+        applyValueRoll env f' (VList rolls)
     _ -> throwError $ InterpreterBug "Evaluator got a non-pool argument"
 
 -- eval (CTMap _ f v) = do

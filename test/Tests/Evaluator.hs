@@ -31,6 +31,11 @@ assertEval expr expected = case evalPreSample expr of
         assertFailure ("Expected " ++ displayObservable expected ++ ", got " ++ displayObservable actual)
   Left err -> assertFailure (displayError err)
 
+assertNoError :: CoreTypedExpr -> Assertion
+assertNoError expr = case evalPreSample expr of
+  Right _ -> return ()
+  Left err -> assertFailure (displayError err)
+
 vNum :: Integer -> Value
 vNum n = VNumber (literal $ fromInteger n)
 
@@ -45,6 +50,12 @@ tListNum = TApp TList TNumber
 
 tFuncNumList :: WeedType
 tFuncNumList = TFunction TNumber tListNum
+
+tDiceNum :: WeedType
+tDiceNum = TApp TDice tNum
+
+tPoolNum :: WeedType
+tPoolNum = TApp TPool tNum
 
 idX :: IdentifierName
 idX = S "x"
@@ -110,5 +121,30 @@ evaluatorTests =
             let identityBuiltin = CTIdentifier (TFunction TNumber TNumber) (B Identity)
             let expr = CTApply TNumber identityBuiltin (cNum 10)
             assertEval expr (vNum 10)
+        ],
+      testGroup
+        "Dice Evaluation"
+        -- these tests have to only assert evaluation, not *correct*
+        -- evaluation, since dice can't be checked for correctness
+        -- (they're in the moand box)
+        [ testCase "7d6 | sum evaluates" $ do
+            let input =
+                  CTMapPool
+                    tDiceNum
+                    (CTIdentifier (TFunction tListNum tNum) (B Sum))
+                    ( CTApply
+                        tPoolNum
+                        ( CTApply
+                            (TFunction tDiceNum tPoolNum)
+                            (CTIdentifier (TFunction tNum (TFunction tDiceNum tPoolNum)) (B Poolify))
+                            (cNum 7)
+                        )
+                        ( CTApply
+                            tDiceNum
+                            (CTIdentifier (TFunction tNum tDiceNum) (B DiceD))
+                            (cNum 6)
+                        )
+                    )
+            assertNoError input
         ]
     ]
