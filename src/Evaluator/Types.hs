@@ -27,7 +27,7 @@ data EvaluationError
   | BadDieParameter Builtin String Value
   | InterpreterBug String
 
-type Roll a = ExceptT EvaluationError (Gen) a
+type Roll a = ExceptT EvaluationError Gen a
 
 liftGen :: Gen a -> Roll a
 liftGen = ExceptT . fmap Right
@@ -52,7 +52,7 @@ displayObservable (VNumber n) = show n
 displayObservable (VBool b) = show b
 displayObservable VUnit = "()"
 displayObservable (VList xs) = "[" ++ intercalate ", " (map displayObservable xs) ++ "]"
-displayObservable (VClosure _ _ _) = "<a closure>"
+displayObservable (VClosure {}) = "<a closure>"
 displayObservable (VBuiltin _) = "<a builtin>"
 displayObservable (VDice _) = "<a dice>"
 displayObservable (VPool _ _) = "<a pool>"

@@ -81,11 +81,11 @@ liftHoles expr = do
       liftA3 SIf (liftExpr cond) (liftExpr t) (liftExpr branchF)
 
     wrapLambdas :: [Int] -> SurfaceExpr -> SurfaceExpr
-    wrapLambdas holes e = foldr (\h acc -> SLambda (U h) acc) e holes
+    wrapLambdas holes e = foldr (SLambda . U) e holes
 
     -- intentionally stops at hole boundaries (parens, pipe, binop)
     hasInfixOrPipe :: SurfaceExpr -> Bool
-    hasInfixOrPipe (SInfix _ _ _) = True
+    hasInfixOrPipe (SInfix {}) = True
     hasInfixOrPipe (SPipe _ _) = True
     hasInfixOrPipe (SUnaryOp _ e) = hasInfixOrPipe e
     hasInfixOrPipe (SApply e1 e2) = hasInfixOrPipe e1 || hasInfixOrPipe e2
@@ -130,23 +130,23 @@ resolveBuiltins expr = return $ runReader (resolveBuiltins' expr) []
     resolveBuiltins' :: SurfaceExpr -> Reader [String] SurfaceExpr
     resolveBuiltins' (SNumber n) = return (SNumber n)
     resolveBuiltins' (SBool b) = return (SBool b)
-    resolveBuiltins' (SUnit) = return SUnit
+    resolveBuiltins' SUnit = return SUnit
     resolveBuiltins' (SList es) = SList <$> mapM resolveBuiltins' es
     resolveBuiltins' (SIdentifier (B b)) = return (SIdentifier (B b))
     resolveBuiltins' (SIdentifier (U u)) = return (SIdentifier (U u))
     resolveBuiltins' (SIdentifier (S s)) = do
       ctx <- ask
-      if elem s ctx
+      if s `elem` ctx
         then
           return (SIdentifier (S s))
         else case lookup s builtinEnv of
           Just b -> return (SIdentifier (B b))
           Nothing -> return (SIdentifier (S s))
-    resolveBuiltins' (SUnaryOp s e) = (SUnaryOp s) <$> (resolveBuiltins' e)
+    resolveBuiltins' (SUnaryOp s e) = SUnaryOp s <$> resolveBuiltins' e
     resolveBuiltins' (SInfix s e1 e2) = liftA2 (SInfix s) (resolveBuiltins' e1) (resolveBuiltins' e2)
     resolveBuiltins' (SParens e) = SParens <$> resolveBuiltins' e
     resolveBuiltins' (SLambda ident body) =
-      let res = (SLambda ident) <$> resolveBuiltins' body
+      let res = SLambda ident <$> resolveBuiltins' body
        in case ident of
             (B _) -> res
             (U _) -> res
@@ -161,7 +161,7 @@ resolveBuiltins expr = return $ runReader (resolveBuiltins' expr) []
             (U _) -> res
             (S s) -> do
               ctx <- ask
-              if elem s ctx then res else local (s :) $ res
+              if s `elem` ctx then res else local (s :) res
     resolveBuiltins' SHole = return SHole
 
 ---
@@ -200,8 +200,8 @@ binaryOpToBuiltin s = Left $ BadBinaryOp s
 dissolveOps :: SurfaceExpr -> Lower CoreUntypedExpr
 dissolveOps (SNumber n) = return $ CUNumber n
 dissolveOps (SBool b) = return $ CUBool b
-dissolveOps (SUnit) = return $ CUUnit
-dissolveOps (SList xs) = CUList <$> (mapM dissolveOps xs)
+dissolveOps SUnit = return CUUnit
+dissolveOps (SList xs) = CUList <$> mapM dissolveOps xs
 dissolveOps (SIdentifier name) = return $ CUIdentifier name
 dissolveOps (SUnaryOp op e) = do
   b <- unaryOpToBuiltin op
@@ -213,7 +213,7 @@ dissolveOps (SInfix op e1 e2) = do
   e2' <- dissolveOps e2
   return $ CUApply (CUApply (CUIdentifier (B b)) e1') e2'
 dissolveOps (SParens e) = dissolveOps e
-dissolveOps (SLambda ident body) = (CULambda ident) <$> dissolveOps body
+dissolveOps (SLambda ident body) = CULambda ident <$> dissolveOps body
 dissolveOps (SApply e1 e2) = liftA2 CUApply (dissolveOps e1) (dissolveOps e2)
 dissolveOps (SPipe e2 e1) = dissolveOps (SApply e1 e2)
 dissolveOps (SIf cond t f) = do
@@ -225,4 +225,4 @@ dissolveOps (SLet ident binding body) = liftA2 (CULet ident) (dissolveOps bindin
 dissolveOps SHole = Left $ InterpreterBug "Hole survived hole resolution"
 
 lower :: SurfaceExpr -> Lower CoreUntypedExpr
-lower e = (return e) >>= liftHoles >>= resolveBuiltins >>= dissolveOps
+lower e = liftHoles e >>= resolveBuiltins >>= dissolveOps

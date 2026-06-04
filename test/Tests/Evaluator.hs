@@ -1,8 +1,6 @@
 module Tests.Evaluator (evaluatorTests) where
 
 import AST
-import Data.List
-import qualified Data.Map as Map
 import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
@@ -17,12 +15,12 @@ eqObservable VUnit VUnit = True
 eqObservable (VList as) (VList bs) = length as == length bs && and (zipWith eqObservable as bs)
 eqObservable _ _ = False
 
-eqError :: EvaluationError -> EvaluationError -> Bool
-eqError (InterpreterBug s1) (InterpreterBug s2) = s1 == s2
-eqError (TypeError t1 v1) (TypeError t2 v2) = t1 == t2 && v1 `eqObservable` v2
-eqError (BadDieParameter b1 s1 v1) (BadDieParameter b2 s2 v2) = b1 == b2 && s1 == s2 && v1 `eqObservable` v2
-eqError (DomainError b1) (DomainError b2) = b1 == b2
-eqError _ _ = False
+-- eqError :: EvaluationError -> EvaluationError -> Bool
+-- eqError (InterpreterBug s1) (InterpreterBug s2) = s1 == s2
+-- eqError (TypeError t1 v1) (TypeError t2 v2) = t1 == t2 && v1 `eqObservable` v2
+-- eqError (BadDieParameter b1 s1 v1) (BadDieParameter b2 s2 v2) = b1 == b2 && s1 == s2 && v1 `eqObservable` v2
+-- eqError (DomainError b1) (DomainError b2) = b1 == b2
+-- eqError _ _ = False
 
 assertEval :: CoreTypedExpr -> Value -> Assertion
 assertEval expr expected = case evalPreSample expr of
@@ -49,7 +47,7 @@ tFuncNumList :: WeedType
 tFuncNumList = TFunction TNumber tListNum
 
 idX :: IdentifierName
-idX = (S "x")
+idX = S "x"
 
 evaluatorTests :: TestTree
 evaluatorTests =
@@ -109,7 +107,7 @@ evaluatorTests =
             let expr = CTApply TNumber identityFunc (cNum 10)
             assertEval expr (vNum 10),
           testCase "id 10 -> 10" $ do
-            let identityBuiltin = (CTIdentifier (TFunction TNumber TNumber) (B Identity))
+            let identityBuiltin = CTIdentifier (TFunction TNumber TNumber) (B Identity)
             let expr = CTApply TNumber identityBuiltin (cNum 10)
             assertEval expr (vNum 10)
         ]

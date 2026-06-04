@@ -5,19 +5,19 @@ import TypeChecker.Infer
 import TypeChecker.Types
 
 noPoly :: WeedType -> WeedTypeScheme
-noPoly t = ForAll [] [] t
+noPoly = ForAll [] []
 
 num1 :: Infer WeedTypeScheme
-num1 = return $ noPoly $ (TNumber ->> TNumber)
+num1 = return $ noPoly (TNumber ->> TNumber)
 
 num2 :: Infer WeedTypeScheme
-num2 = return $ noPoly $ (TNumber ->> TNumber ->> TNumber)
+num2 = return $ noPoly (TNumber ->> TNumber ->> TNumber)
 
 bool1 :: Infer WeedTypeScheme
-bool1 = return $ noPoly $ (TBool ->> TBool)
+bool1 = return $ noPoly (TBool ->> TBool)
 
 bool2 :: Infer WeedTypeScheme
-bool2 = return $ noPoly $ (TBool ->> TBool ->> TBool)
+bool2 = return $ noPoly (TBool ->> TBool ->> TBool)
 
 any1 :: Infer WeedTypeScheme
 any1 = do
@@ -30,10 +30,10 @@ any2 = do
   return $ ForAll [tv] [] (TVar tv ->> TVar tv ->> TVar tv)
 
 dice1 :: Infer WeedTypeScheme
-dice1 = return $ noPoly $ (TNumber ->> mkDice TNumber)
+dice1 = return $ noPoly (TNumber ->> mkDice TNumber)
 
 dice2 :: Infer WeedTypeScheme
-dice2 = return $ noPoly $ (TNumber ->> TNumber ->> mkDice TNumber)
+dice2 = return $ noPoly (TNumber ->> TNumber ->> mkDice TNumber)
 
 builtinType :: Builtin -> Infer WeedTypeScheme
 builtinType Negate = num1
@@ -66,7 +66,7 @@ builtinType Map = do
   let ta = TVar a
   let tb = TVar b
   let f' = TApp (TVar f)
-  return $ ForAll [f, a, b] [CInstanceOf CFunctor (TVar f)] ((ta ->> tb) ->> (f' ta) ->> (f' tb))
+  return $ ForAll [f, a, b] [CInstanceOf CFunctor (TVar f)] ((ta ->> tb) ->> f' ta ->> f' tb)
 builtinType Ap = do
   m <- fresh
   a <- fresh
@@ -74,7 +74,7 @@ builtinType Ap = do
   let ta = TVar a
   let tb = TVar b
   let m' = TApp (TVar m)
-  return $ ForAll [m, a, b] [CInstanceOf CMonad (TVar m)] ((m' (ta ->> tb)) ->> (m' ta) ->> (m' tb))
+  return $ ForAll [m, a, b] [CInstanceOf CMonad (TVar m)] (m' (ta ->> tb) ->> m' ta ->> m' tb)
 builtinType Return = do
   m <- fresh
   a <- fresh
@@ -88,7 +88,7 @@ builtinType Bind = do
   let ta = TVar a
   let tb = TVar b
   let m' = TApp (TVar m)
-  return $ ForAll [m, a, b] [CInstanceOf CMonad (TVar m)] ((m' ta) ->> (ta ->> m' tb) ->> (m' tb))
+  return $ ForAll [m, a, b] [CInstanceOf CMonad (TVar m)] (m' ta ->> (ta ->> m' tb) ->> m' tb)
 builtinType DiceD = dice1
 builtinType DiceS = do
   tv <- fresh
@@ -102,8 +102,8 @@ builtinType DiceCoin = return $ noPoly $ mkDice TBool
 builtinType DiceCircle = dice1
 builtinType Constant = do
   tv <- fresh
-  return $ noPoly $ (TVar tv ->> mkDice (TVar tv))
-builtinType Collapse = return $ noPoly $ (mkPool TNumber ->> mkDice TNumber)
+  return $ noPoly (TVar tv ->> mkDice (TVar tv))
+builtinType Collapse = return $ noPoly (mkPool TNumber ->> mkDice TNumber)
 builtinType Source = do
   f <- fresh
   a <- fresh
@@ -112,5 +112,5 @@ builtinType Source = do
   return $ ForAll [f, a] [CInstanceOf CRollable tf] (TApp tf ta ->> mkDice tf)
 builtinType Poolify = do
   tv <- fresh
-  return $ noPoly $ (TNumber ->> mkDice tv ->> mkPool tv)
-builtinType Sum = return $ noPoly $ (mkList TNumber ->> TNumber)
+  return $ noPoly (TNumber ->> mkDice tv ->> mkPool tv)
+builtinType Sum = return $ noPoly (mkList TNumber ->> TNumber)

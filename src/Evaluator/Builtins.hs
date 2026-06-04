@@ -14,35 +14,35 @@ import Test.QuickCheck.Gen
 import TypeChecker.Types
 
 assertNumber :: Value -> Roll WeedNumber
-assertNumber (VNumber n) = return $ n
-assertNumber e = throwError $ TypeError (TNumber) e
+assertNumber (VNumber n) = return n
+assertNumber e = throwError $ TypeError TNumber e
 
 assertNumberE :: Value -> Eval WeedNumber
-assertNumberE (VNumber n) = return $ n
-assertNumberE e = throwError $ TypeError (TNumber) e
+assertNumberE (VNumber n) = return n
+assertNumberE e = throwError $ TypeError TNumber e
 
 assertRealE :: Builtin -> Value -> Eval Double
 assertRealE builtin (VNumber wn) = do
   let real = realPart $ value wn
   let imag = imagPart $ value wn
   if imag == 0 then return real else throwError $ DomainError builtin
-assertRealE _ e = throwError $ TypeError (TNumber) e
+assertRealE _ e = throwError $ TypeError TNumber e
 
 assertBoolE :: Value -> Eval Bool
-assertBoolE (VBool b) = return $ b
-assertBoolE e = throwError $ TypeError (TBool) e
+assertBoolE (VBool b) = return b
+assertBoolE e = throwError $ TypeError TBool e
 
 assertListE :: Value -> Eval [Value]
-assertListE (VList xs) = return $ xs
+assertListE (VList xs) = return xs
 assertListE e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
 
 assertDiceE :: Value -> Eval (Roll Value)
-assertDiceE (VDice r) = return $ r
-assertDiceE e = throwError $ TypeError (TDice) e
+assertDiceE (VDice r) = return r
+assertDiceE e = throwError $ TypeError TDice e
 
 assertPoolE :: Value -> Eval (Roll [Value], Roll Value)
-assertPoolE (VPool r s) = return $ (r, s)
-assertPoolE e = throwError $ TypeError (TPool) e
+assertPoolE (VPool r s) = return (r, s)
+assertPoolE e = throwError $ TypeError TPool e
 
 --
 -- Helper functions to lift functions into builtins that automatically lift/collapse into dice expressions.
@@ -50,14 +50,14 @@ assertPoolE e = throwError $ TypeError (TPool) e
 --
 --
 liftNumber :: (WeedNumber -> WeedNumber) -> Value
-liftNumber f = VBuiltin $ liftNumber'
+liftNumber f = VBuiltin liftNumber'
   where
     liftNumber' :: Value -> Eval Value
     liftNumber' (VNumber n) = return $ VNumber (f n)
     liftNumber' e = throwError $ TypeError TNumber e
 
 liftBool :: (Bool -> Bool) -> Value
-liftBool f = VBuiltin $ liftBool'
+liftBool f = VBuiltin liftBool'
   where
     liftBool' :: Value -> Eval Value
     liftBool' (VBool b) = return $ VBool (f b)
@@ -95,14 +95,14 @@ liftRealCmp ident f = VBuiltin $ \a -> return $ VBuiltin $ \b -> do
 equality :: Value -> Value -> Eval Value
 equality (VNumber a) (VNumber b) = return $ VBool (a =~= b)
 equality (VBool a) (VBool b) = return $ VBool (a == b)
-equality (VUnit) (VUnit) = return $ VBool True
-equality (VClosure _ _ _) (VClosure _ _ _) = throwError $ BadComparisonType "function"
+equality VUnit VUnit = return $ VBool True
+equality (VClosure {}) (VClosure {}) = throwError $ BadComparisonType "function"
 equality (VBuiltin _) (VBuiltin _) = throwError $ BadComparisonType "function"
 equality (VList a) (VList b)
   | length a /= length b = return $ VBool False
   | otherwise = do
-      eqs <- (zipWithM equality a b) >>= (mapM assertBoolE)
-      return $ VBool (all id eqs)
+      eqs <- zipWithM equality a b >>= mapM assertBoolE
+      return $ VBool (and eqs)
 equality (VDice _) (VDice _) = throwError $ BadComparisonType "dice"
 equality (VPool _ _) (VPool _ _) = throwError $ BadComparisonType "pool"
 equality _ _ = throwError $ InterpreterBug "Mistyped comparison"
@@ -172,7 +172,7 @@ fetchBuiltin _ Floor = liftNumber wnFloor
 fetchBuiltin _ Ceil = liftNumber wnCeil
 fetchBuiltin _ Eq = liftValue2 equality
 fetchBuiltin _ Neq =
-  liftValue2 $ \a b -> VBool . not <$> ((equality a b) >>= assertBoolE)
+  liftValue2 $ \a b -> VBool . not <$> (equality a b >>= assertBoolE)
 fetchBuiltin _ Le = liftRealCmp Le (<=)
 fetchBuiltin _ Lt = liftRealCmp Lt (<)
 fetchBuiltin _ Ge = liftRealCmp Ge (>=)
@@ -205,7 +205,7 @@ fetchBuiltin apt Ap = VBuiltin $ \mf -> return $ VBuiltin $ \ma -> do
     (TApp TList _) -> do
       lf <- assertListE mf
       la <- assertListE mf
-      VList <$> (sequence $ map applyValue lf <*> la)
+      VList <$> sequence (map applyValue lf <*> la)
     (TApp TDice _) -> do
       df <- assertDiceE mf
       da <- assertDiceE ma
@@ -250,8 +250,8 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
   -- bind, like map, can inspect its input type
   case m of
     VList l -> do
-      vs <- sequence $ map (applyValue f) l
-      (VList . concat) <$> mapM assertListE vs
+      vs <- mapM (applyValue f) l
+      VList . concat <$> mapM assertListE vs
     VDice d -> return $ VDice $ bindDice d
     VPool pool source -> do
       let boundPool = pool >>= mapM (bindDice . return)
@@ -260,22 +260,22 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
     _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" ++ displayObservable m ++ ">>=" ++ displayObservable f ++ ")"
 
 -- TODO: dice need criticality
-fetchBuiltin _ DiceD = onePosIntParam DiceD $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (1, i)
+fetchBuiltin _ DiceD = onePosIntParam DiceD $ \i -> VNumber . literal . fromIntegral <$> chooseInt (1, i)
 fetchBuiltin _ DiceS = VBuiltin $ \n -> do
   n' <- assertListE n
   case n' of
     [] -> throwError $ BadDieParameter DiceS "expected a non-empty list" n
     _ -> (return . VDice . liftGen . elements) n'
-fetchBuiltin _ DiceF = onePosIntParam DiceF $ \i -> (VNumber . literal . fromIntegral) <$> chooseInt (-i, i)
-fetchBuiltin _ DiceU = oneDoubleParam DiceU $ \i -> (VNumber . literal) <$> choose (0.0, i)
+fetchBuiltin _ DiceF = onePosIntParam DiceF $ \i -> VNumber . literal . fromIntegral <$> chooseInt (-i, i)
+fetchBuiltin _ DiceU = oneDoubleParam DiceU $ \i -> VNumber . literal <$> choose (0.0, i)
 fetchBuiltin _ DiceGauss = oneDoubleParam DiceGauss $ \n ->
-  (VNumber . literal) <$> do
+  VNumber . literal <$> do
     u1 <- choose (0.0, 1.0)
     u2 <- choose (0.0, 1.0)
-    let z = sqrt (-2.0 * log u1) * cos (2.0 * pi * u2)
+    let z = sqrt (- (2.0 * log u1)) * cos (2.0 * pi * u2)
     return $ n * z
 fetchBuiltin _ DicePareto = oneDoubleParam DicePareto $ \n ->
-  (VNumber . literal) <$> do
+  VNumber . literal <$> do
     u <- choose (0.0, 1.0)
     return $ u ** (1.0 / n)
 fetchBuiltin _ DiceBinomial = VBuiltin $ \n -> return $ VBuiltin $ \p -> do
@@ -298,12 +298,12 @@ fetchBuiltin _ DiceCircle = oneDoubleParam DiceCircle $ \r -> do
   theta <- choose (0.0, 2.0 * pi)
   return . VNumber $ complexLiteral (r * cos theta) (r * sin theta)
 fetchBuiltin _ Constant = VBuiltin $ return . VDice . liftGen . return
-fetchBuiltin _ Collapse = VBuiltin $ collapse
+fetchBuiltin _ Collapse = VBuiltin collapse
   where
     collapse :: Value -> Eval Value
-    collapse (VPool pool _) = return $ VDice $ (VNumber . sum) <$> (pool >>= (mapM assertNumber))
+    collapse (VPool pool _) = return $ VDice $ VNumber . sum <$> (pool >>= mapM assertNumber)
     collapse e = throwError $ TypeError (mkPool TNumber) e
-fetchBuiltin _ Source = VBuiltin $ source
+fetchBuiltin _ Source = VBuiltin source
   where
     source :: Value -> Eval Value
     source (VDice d) = return $ VDice d
@@ -324,4 +324,4 @@ fetchBuiltin _ Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
     poolify n _ = throwError $ TypeError TNumber n
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertListE xs
-  VNumber . sum <$> (mapM assertNumberE xs')
+  VNumber . sum <$> mapM assertNumberE xs'

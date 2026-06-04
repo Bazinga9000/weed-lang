@@ -12,7 +12,7 @@ parse :: [Token] -> SurfaceExpr
 parse = parseSurface
 
 sMap :: SurfaceExpr -> SurfaceExpr -> SurfaceExpr
-sMap f x = SApply (SApply (SIdentifier (S "map")) f) x
+sMap f = SApply (SApply (SIdentifier (S "map")) f)
 
 surfaceParserTests :: TestTree
 surfaceParserTests =
@@ -63,12 +63,18 @@ surfaceParserTests =
               @?= SInfix "+" SHole (SNumber 2.0),
           testCase "4d6 - Parses dice correctly" $
             -- the desugaring is done in the lowering step
+            -- the desugaring is done in the lowering step
+            
+            -- the desugaring is done in the lowering step
             parse [TokenNum 4.0, TokenBuiltin DiceD, TokenNum 6.0]
               @?= SApply (SApply (SNumber 4.0) (SIdentifier (B DiceD))) (SNumber 6.0),
           testCase "3 | (_ + 5) - Parses pipes" $
             parse [TokenNum 3.0, TokenOp "|", TokenHole, TokenOp "+", TokenNum 5.0]
               @?= SPipe (SNumber 3.0) (SInfix "+" SHole (SNumber 5.0)),
           testCase "4 # d6 - Parses pool hash operator" $
+            -- # has fixity 5, Application has fixity 10
+            -- # has fixity 5, Application has fixity 10
+            
             -- # has fixity 5, Application has fixity 10
             parse [TokenNum 4.0, TokenOp "#", TokenBuiltin DiceD, TokenNum 6.0]
               @?= SInfix "#" (SNumber 4.0) (SApply (SIdentifier (B DiceD)) (SNumber 6.0))

@@ -13,12 +13,12 @@ import TypeChecker.Types
 -- infer the type of an untyped expression,
 -- emitting all necesssary constraints for the solver to un
 infer :: CoreUntypedExpr -> Infer (WeedType, CoreTypedExpr)
-infer (CUNumber n) = return $ (TNumber, CTNumber n)
-infer (CUBool b) = return $ (TBool, CTBool b)
-infer (CUUnit) = return $ (TUnit, CTUnit)
+infer (CUNumber n) = return (TNumber, CTNumber n)
+infer (CUBool b) = return (TBool, CTBool b)
+infer CUUnit = return (TUnit, CTUnit)
 infer (CUList []) = do
   t <- fresh
-  return $ (mkList t, CTList t [])
+  return (mkList t, CTList t [])
 infer (CUList (x : xs)) = do
   t <- fresh
   (tx, cx) <- infer x
@@ -26,15 +26,15 @@ infer (CUList (x : xs)) = do
   unify t tx
   unify (mkList t) txs
   let listType = mkList t
-  newList <- (CTList listType) <$> appendCList cx cxs
-  return $ (listType, newList)
+  newList <- CTList listType <$> appendCList cx cxs
+  return (listType, newList)
   where
     appendCList :: CoreTypedExpr -> CoreTypedExpr -> Infer [CoreTypedExpr]
-    appendCList cx (CTList _ cxs) = return $ (cx : cxs)
+    appendCList cx (CTList _ cxs) = return (cx : cxs)
     appendCList _ e = throwError $ "TC Bug: Expected a list, got " ++ show e
 infer (CUIdentifier (B builtin)) = do
   t <- builtinType builtin >>= instantiate
-  return $ (t, CTIdentifier t (B builtin))
+  return (t, CTIdentifier t (B builtin))
 infer (CUIdentifier ident) = (\t -> (t, CTIdentifier t ident)) <$> lookupEnv ident
 infer (CULambda ident body) = do
   tv <- fresh
@@ -59,7 +59,7 @@ infer (CUApply f arg) = do
         tb <- builtinType builtin >>= instantiate
         trNew <- fresh
         unify tb (argT ->> trNew)
-        let builtinNode = (CTIdentifier tb (B builtin))
+        let builtinNode = CTIdentifier tb (B builtin)
         return (trNew, CTApply trNew builtinNode argC)
 
   let call2 builtin argT1 argC1 argT2 argC2 = do
@@ -68,8 +68,8 @@ infer (CUApply f arg) = do
         trNew <- fresh
         unify tb (argT1 ->> tMiddle)
         unify tMiddle (argT2 ->> trNew)
-        let builtinNode = (CTIdentifier tb (B builtin))
-        let ap1 = (CTApply tMiddle builtinNode argC1)
+        let builtinNode = CTIdentifier tb (B builtin)
+        let ap1 = CTApply tMiddle builtinNode argC1
         return (trNew, CTApply trNew ap1 argC2)
 
   -- attempt standard application

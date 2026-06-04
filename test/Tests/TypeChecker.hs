@@ -40,7 +40,7 @@ add :: CoreUntypedExpr
 add = CUIdentifier (B Add)
 
 mkIf :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
-mkIf cond t f = CUApply (CUApply (CUApply (CUIdentifier (B If)) cond) t) f
+mkIf cond t = CUApply (CUApply (CUApply (CUIdentifier (B If)) cond) t)
 
 coin :: CoreUntypedExpr
 coin = CUIdentifier (B DiceCoin)
@@ -52,16 +52,16 @@ idX :: IdentifierName
 idX = S "x"
 
 cuMap :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
-cuMap f x = CUApply (CUApply (CUIdentifier (B Map)) f) x
+cuMap f = CUApply (CUApply (CUIdentifier (B Map)) f)
 
 cuAp :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
-cuAp f x = CUApply (CUApply (CUIdentifier (B Ap)) f) x
+cuAp f = CUApply (CUApply (CUIdentifier (B Ap)) f)
 
 cuBind :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
-cuBind f x = CUApply (CUApply (CUIdentifier (B Bind)) f) x
+cuBind f = CUApply (CUApply (CUIdentifier (B Bind)) f)
 
 cuReturn :: CoreUntypedExpr -> CoreUntypedExpr
-cuReturn x = CUApply (CUIdentifier (B Return)) x
+cuReturn = CUApply (CUIdentifier (B Return))
 
 typeCheckerTests :: TestTree
 typeCheckerTests =

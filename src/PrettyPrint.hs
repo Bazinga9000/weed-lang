@@ -99,7 +99,7 @@ instance PrettyPrintable CoreUntypedExpr where
 instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTNumber n) = show n
   prettyPrint (CTBool b) = show b
-  prettyPrint (CTUnit) = "()"
+  prettyPrint CTUnit = "()"
   prettyPrint (CTList t xs) = prettyPrint xs ++ "::" ++ prettyPrint t
   prettyPrint (CTIdentifier t n) = "(" ++ prettyPrint n ++ "::" ++ prettyPrint t ++ ")"
   prettyPrint (CTLambda t ident body) = "(λ" ++ prettyPrint ident ++ "::" ++ prettyPrint t ++ " -> " ++ prettyPrint body ++ ")"
@@ -110,7 +110,7 @@ instance PrettyPrintable CoreTypedExpr where
 instance PrettyPrintable Value where
   prettyPrint (VNumber n) = show n
   prettyPrint (VBool b) = show b
-  prettyPrint (VUnit) = "()"
+  prettyPrint VUnit = "()"
   prettyPrint (VList xs) = prettyPrint xs
   prettyPrint (VBuiltin _) = "<A Builtin>"
   prettyPrint (VClosure _ ident body) = "(λ" ++ prettyPrint ident ++ " -> " ++ prettyPrint body ++ ")"
@@ -118,7 +118,7 @@ instance PrettyPrintable Value where
   prettyPrint (VDice _) = "<A Dice>"
 
 instance PrettyPrintable EvaluationError where
-  prettyPrint (DivisionByZero) = "Division by zero"
+  prettyPrint DivisionByZero = "Division by zero"
   prettyPrint (BadComparisonType t) = "Bad comparison type: " ++ show t
   prettyPrint (DomainError b) = "Domain error: Builtin " ++ prettyPrint b ++ " expected real, got complex"
   prettyPrint (TypeError t v) = "Type error: Expected " ++ prettyPrint t ++ ", got " ++ prettyPrint v
@@ -146,12 +146,11 @@ displayTypedAST e = unlines $ snd $ runWriter $ runReaderT (mkTree e) 0
     mkTree :: CoreTypedExpr -> Tree ()
     mkTree (CTNumber n) = tellAtDepth ["|- " ++ show n ++ " :: Number"]
     mkTree (CTBool b) = tellAtDepth ["|- " ++ show b ++ " :: Bool"]
-    mkTree (CTUnit) = tellAtDepth ["|- () :: Unit"]
+    mkTree CTUnit = tellAtDepth ["|- () :: Unit"]
     mkTree (CTList t es) = do
       tellAtDepth ["|- " ++ prettyPrint t]
       let deeper e' = local (+ 1) (mkTree e')
-      _ <- sequence $ map deeper es
-      return ()
+      mapM_ deeper es
     mkTree (CTIdentifier t n) = tellAtDepth ["|- " ++ prettyPrint n ++ " :: " ++ prettyPrint t]
     mkTree (CTLambda t n body) = do
       tellAtDepth ["|- lambda " ++ prettyPrint n ++ " :: " ++ prettyPrint t]

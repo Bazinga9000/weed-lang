@@ -28,7 +28,7 @@ applyValueRoll env f arg = case runEval env (applyValue f arg) of
 eval :: CoreTypedExpr -> Eval Value
 eval (CTNumber n) = return $ VNumber $ literal n
 eval (CTBool b) = return $ VBool b
-eval (CTUnit) = return VUnit
+eval CTUnit = return VUnit
 eval (CTList _ xs) = do
   xs' <- mapM eval xs
   return $ VList xs'
@@ -56,7 +56,7 @@ eval (CTMapPool _ f p) = do
       env <- ask
       return $ VDice $ do
         rolls <- pool
-        evs <- (sequence . map (applyValueRoll env f')) $ rolls
+        evs <- mapM (applyValueRoll env f') rolls
         return $ VList evs
     _ -> throwError $ InterpreterBug "Evaluator got a non-pool argument"
 
