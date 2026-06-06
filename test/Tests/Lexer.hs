@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Tests.Lexer (lexerTests) where
 
 import AST (Builtin (..))

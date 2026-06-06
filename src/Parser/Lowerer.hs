@@ -2,9 +2,9 @@ module Parser.Lowerer where
 
 import AST
 import Control.Applicative
-import Control.Monad.Reader
-import Control.Monad.State
-import Control.Monad.Writer
+import Control.Monad.RWS.CPS
+import qualified Data.List as L
+import Prelude hiding (Ap, Identity, Sum)
 
 data LoweringError
   = TopLevelHole
@@ -59,7 +59,8 @@ desugarPoolify SHole = SHole
 -- no holes remain in the AST after this
 ---
 
-type Lifter a = WriterT [Int] (StateT Int Lower) a
+-- type Lifter a = WriterT [Int] (StateT Int Lower) a
+type Lifter a = RWST () [Int] Int Lower a
 
 -- executes an action, captures any holes it emitted, and PREVENTS them
 -- from bubbling up any further with listen/censor.
@@ -68,7 +69,7 @@ captureHoles action = censor (const []) (listen action)
 
 liftHoles :: SurfaceExpr -> Lower SurfaceExpr
 liftHoles expr = do
-  (finalExpr, unresolvedHoles) <- evalStateT (runWriterT (liftExpr expr)) 1
+  (finalExpr, _, unresolvedHoles) <- runRWST (liftExpr expr) () 1
 
   case unresolvedHoles of
     [] -> Right finalExpr
@@ -177,7 +178,7 @@ resolveBuiltins expr = return $ runReader (resolveBuiltins' expr) []
       if s `elem` ctx
         then
           return (SIdentifier (S s))
-        else case lookup s builtinEnv of
+        else case L.lookup s builtinEnv of
           Just b -> return (SIdentifier (B b))
           Nothing -> return (SIdentifier (S s))
     resolveBuiltins' (SUnaryOp s e) = SUnaryOp s <$> resolveBuiltins' e

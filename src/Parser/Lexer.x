@@ -2,6 +2,7 @@
 module Parser.Lexer (Token(..), scanTokens) where
 import AST (Builtin(..))
 import Data.Char (isDigit)
+import Text.Read (read)
 
 }
 

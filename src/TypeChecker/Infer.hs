@@ -1,8 +1,8 @@
 module TypeChecker.Infer where
 
 import AST
-import Control.Monad.Except
-import Control.Monad.RWS
+import Control.Monad.Except (Except, throwError)
+import Control.Monad.RWS.CPS (RWST, tell)
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -45,7 +45,7 @@ lookupEnv :: IdentifierName -> Infer WeedType
 lookupEnv x = do
   (TypeEnv env) <- ask
   case Map.lookup x env of
-    Nothing -> throwError $ "Unbound identifier: " ++ show x
+    Nothing -> throwError $ "Unbound identifier: " <> show x
     Just s -> instantiate s
 
 class Freshable a where
@@ -65,7 +65,7 @@ bind n t
   -- t is in fact the tvar already: do nothing
   | t == TVar n = return nullSubst
   -- check for infinite type: n occurs in t's free type variables
-  | n `Set.member` ftv t = throwError $ "Infinite type: " ++ show n ++ " occurs in " ++ show t
+  | n `Set.member` ftv t = throwError $ "Infinite type: " <> show n <> " occurs in " <> show t
   -- otherwise, bind the variable to the type
   | otherwise = return (Map.singleton n t)
 
@@ -86,7 +86,7 @@ unify' (TApp a b) (TApp a' b') = do
   s1 <- unify' a a'
   s2 <- unify' (apply s1 b) (apply s1 b')
   return $ s2 `compose` s1
-unify' t1' t2' = throwError $ "Could not unify" ++ show t1' ++ " and " ++ show t2'
+unify' t1' t2' = throwError $ "Could not unify" <> show t1' <> " and " <> show t2'
 
 unify :: WeedType -> WeedType -> Infer ()
 unify t1 t2 = do

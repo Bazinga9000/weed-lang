@@ -1,7 +1,6 @@
 module Tests.Lowerer (lowererTests) where
 
 import AST
-import Data.Either (isLeft)
 import Parser.Lowerer
 import Test.Tasty
 import Test.Tasty.HUnit

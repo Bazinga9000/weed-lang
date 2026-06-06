@@ -3,12 +3,13 @@
 module TypeChecker where
 
 import AST
-import Control.Monad.Except
-import Control.Monad.RWS
+import Control.Monad.Except (runExcept, throwError)
+import Control.Monad.RWS.CPS (censor, listen, runRWST, tell)
 import TypeChecker.BuiltinTypes
 import TypeChecker.Infer
 import TypeChecker.Subst
 import TypeChecker.Types
+import Prelude hiding (Ap, Identity, Sum, lookupEnv)
 
 -- infer the type of an untyped expression,
 -- emitting all necesssary constraints for the solver to un
@@ -31,7 +32,7 @@ infer (CUList (x : xs)) = do
   where
     appendCList :: CoreTypedExpr -> CoreTypedExpr -> Infer [CoreTypedExpr]
     appendCList cx (CTList _ cxs) = return (cx : cxs)
-    appendCList _ e = throwError $ "TC Bug: Expected a list, got " ++ show e
+    appendCList _ e = throwError $ "TC Bug: Expected a list, got " <> show e
 infer (CUIdentifier (B builtin)) = do
   t <- builtinType builtin >>= instantiate
   return (t, CTIdentifier t (B builtin))
@@ -229,9 +230,9 @@ solve finalSubst constraints =
             (CRollable, TDice) -> Right ()
             (CRollable, TPool) -> Right ()
             -- Ambiguous top-level type variable
-            (c, TVar tv) -> Left $ "Ambiguous type variable " ++ show tv ++ " for class " ++ show c
+            (c, TVar tv) -> Left $ "Ambiguous type variable " <> show tv <> " for class " <> show c
             -- Missing instance
-            (c, t') -> Left $ "No instance for " ++ show c ++ " for type " ++ show t'
+            (c, t') -> Left $ "No instance for " <> show c <> " for type " <> show t'
 
 typeCheck :: CoreUntypedExpr -> Either TypeError CoreTypedExpr
 typeCheck expr = do

@@ -1,17 +1,17 @@
 module Evaluator.Builtins (fetchBuiltin) where
 
 import AST
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.Reader
-import Data.Complex
 -- TODO: this is a cyclic dependency, but only because of the monads needing access to `eval`, `applyValue`, `applyValueRoll`import Evaluator
 -- figure out a way to clean this up later
+import Control.Monad.Except
+import Data.Complex
 import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
+import Numeric (Floating (log))
 import Test.QuickCheck.Gen
 import TypeChecker.Types
+import Prelude hiding (Ap, Identity, Sum)
 
 assertNumber :: Value -> Roll WeedNumber
 assertNumber (VNumber n) = return n
@@ -257,7 +257,7 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
       let boundPool = pool >>= mapM (bindDice . return)
       let boundSource = bindDice source
       return $ VPool boundPool boundSource
-    _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" ++ displayObservable m ++ ">>=" ++ displayObservable f ++ ")"
+    _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> displayObservable m <> ">>=" <> displayObservable f <> ")"
 
 -- TODO: dice need criticality
 fetchBuiltin _ DiceD = onePosIntParam DiceD $ \i -> VNumber . literal . fromIntegral <$> chooseInt (1, i)
@@ -272,7 +272,7 @@ fetchBuiltin _ DiceGauss = oneDoubleParam DiceGauss $ \n ->
   VNumber . literal <$> do
     u1 <- choose (0.0, 1.0)
     u2 <- choose (0.0, 1.0)
-    let z = sqrt (- (2.0 * log u1)) * cos (2.0 * pi * u2)
+    let z = sqrt (-(2.0 * log u1)) * cos (2.0 * pi * u2)
     return $ n * z
 fetchBuiltin _ DicePareto = oneDoubleParam DicePareto $ \n ->
   VNumber . literal <$> do

@@ -5,6 +5,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import TypeChecker
 import TypeChecker.Types
+import Prelude hiding (Ap, Identity, Sum)
 
 getType :: CoreTypedExpr -> WeedType
 getType (CTNumber _) = TNumber
@@ -19,13 +20,14 @@ getType (CTMapPool t _ _) = t
 
 assertType :: CoreUntypedExpr -> WeedType -> Assertion
 assertType expr expectedType = case typeCheck expr of
-  Left err -> assertFailure $ "Type checking failed with error: " ++ err
+  Left err -> (assertFailure . toString) $ "Type checking failed with error: " <> err
   Right typedExpr -> getType typedExpr @?= expectedType
 
 assertTypeError :: CoreUntypedExpr -> Assertion
 assertTypeError expr = case typeCheck expr of
   Left _ -> return ()
-  Right typedExpr -> assertFailure $ "Expected type error, but succeeded with type: " ++ show (getType typedExpr)
+  -- this one actually works without a toString because of inference! Yay!
+  Right typedExpr -> assertFailure $ "Expected type error, but succeeded with type: " <> show (getType typedExpr)
 
 d6 :: CoreUntypedExpr
 d6 = CUApply (CUIdentifier (B DiceD)) (CUNumber 6)

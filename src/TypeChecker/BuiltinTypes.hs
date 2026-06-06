@@ -3,6 +3,7 @@ module TypeChecker.BuiltinTypes (builtinType) where
 import AST
 import TypeChecker.Infer
 import TypeChecker.Types
+import Prelude hiding (Ap, Identity, Sum)
 
 noPoly :: WeedType -> WeedTypeScheme
 noPoly = ForAll [] []

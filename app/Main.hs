@@ -1,12 +1,11 @@
 module Main where
 
-import Control.Monad.IO.Class (liftIO)
-import System.Console.Haskeline
 import Evaluator
 import Evaluator.Types (displayError, displayObservable)
 import Parser.Lexer
 import Parser.Lowerer
 import Parser.SurfaceParser
+import System.Console.Haskeline
 import TypeChecker
 
 main :: IO ()
@@ -28,11 +27,11 @@ repl input = do
   let surface = parseSurface toks
 
   case lower surface of
-    Left e -> putStrLn $ "Lowering error: " ++ show e
+    Left e -> putTextLn $ "Lowering error: " <> show e
     Right coreu -> case typeCheck coreu of
-      Left e -> putStrLn $ "Type error: " ++ show e
+      Left e -> putTextLn $ "Type error: " <> show e
       Right coret -> do
         ev <- evaluate coret
         case ev of
-          Left err -> putStrLn $ "Evaluation error: " ++ displayError err
-          Right v -> putStrLn $ displayObservable v
+          Left err -> putTextLn $ "Evaluation error: " <> displayError err
+          Right v -> putTextLn $ displayObservable v

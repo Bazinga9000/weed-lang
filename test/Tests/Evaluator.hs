@@ -7,6 +7,7 @@ import Evaluator.WeedNumber
 import Test.Tasty
 import Test.Tasty.HUnit
 import TypeChecker.Types
+import Prelude hiding (Ap, Identity, Sum)
 
 eqObservable :: Value -> Value -> Bool
 eqObservable (VNumber a) (VNumber b) = a =~= b
@@ -28,13 +29,13 @@ assertEval expr expected = case evalPreSample expr of
     if actual `eqObservable` expected
       then return ()
       else
-        assertFailure ("Expected " ++ displayObservable expected ++ ", got " ++ displayObservable actual)
-  Left err -> assertFailure (displayError err)
+        (assertFailure . toString) ("Expected " <> displayObservable expected <> ", got " <> displayObservable actual)
+  Left err -> (assertFailure . toString) (displayError err)
 
 assertNoError :: CoreTypedExpr -> Assertion
 assertNoError expr = case evalPreSample expr of
   Right _ -> return ()
-  Left err -> assertFailure (displayError err)
+  Left err -> (assertFailure . toString) (displayError err)
 
 vNum :: Integer -> Value
 vNum n = VNumber (literal $ fromInteger n)

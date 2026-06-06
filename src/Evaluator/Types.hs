@@ -3,10 +3,8 @@
 module Evaluator.Types where
 
 import AST
-import Control.Monad.Except
-import Control.Monad.Reader
-import Data.List (intercalate)
 import qualified Data.Map as Map
+import qualified Data.Text as T
 import Evaluator.WeedNumber (WeedNumber)
 import Test.QuickCheck.Gen
 import TypeChecker.Types
@@ -21,11 +19,11 @@ lookupIdent env name = Map.lookup name env
 
 data EvaluationError
   = DivisionByZero
-  | BadComparisonType String
+  | BadComparisonType Text
   | DomainError Builtin
   | TypeError WeedType Value
-  | BadDieParameter Builtin String Value
-  | InterpreterBug String
+  | BadDieParameter Builtin Text Value
+  | InterpreterBug Text
 
 type Roll a = ExceptT EvaluationError Gen a
 
@@ -47,21 +45,21 @@ data Value
   | VDice (Roll Value)
   | VPool (Roll [Value]) (Roll Value) -- pool, source
 
-displayObservable :: Value -> String
+displayObservable :: Value -> Text
 displayObservable (VNumber n) = show n
 displayObservable (VBool b) = show b
 displayObservable VUnit = "()"
-displayObservable (VList xs) = "[" ++ intercalate ", " (map displayObservable xs) ++ "]"
+displayObservable (VList xs) = "[" <> T.intercalate ", " (map displayObservable xs) <> "]"
 displayObservable (VClosure {}) = "<a closure>"
 displayObservable (VBuiltin _) = "<a builtin>"
 displayObservable (VDice _) = "<a dice>"
 displayObservable (VPool _ _) = "<a pool>"
 
-displayError :: EvaluationError -> String
+displayError :: EvaluationError -> Text
 displayError = \case
   DivisionByZero -> "division by zero"
-  BadComparisonType t -> "bad comparison type: " ++ t
-  DomainError b -> "domain error: " ++ show b ++ " expected real, got complex"
-  TypeError t v -> "interpreter bug (type error): wanted " ++ show t ++ " got " ++ displayObservable v
-  BadDieParameter b s v -> "bad die parameter: die " ++ show b ++ " " ++ s ++ " " ++ displayObservable v
-  InterpreterBug s -> "interpreter bug: " ++ s
+  BadComparisonType t -> "bad comparison type: " <> t
+  DomainError b -> "domain error: " <> show b <> " expected real, got complex"
+  TypeError t v -> "interpreter bug (type error): wanted " <> show t <> " got " <> displayObservable v
+  BadDieParameter b s v -> "bad die parameter: die " <> show b <> " " <> s <> " " <> displayObservable v
+  InterpreterBug s -> "interpreter bug: " <> s

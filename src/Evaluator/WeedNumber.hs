@@ -1,6 +1,7 @@
 module Evaluator.WeedNumber where
 
 import Data.Complex
+import Numeric (Floating (log))
 
 newtype WeedNumber = WeedNumber
   { value :: Complex Double

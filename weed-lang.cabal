@@ -6,17 +6,25 @@ author:          Bazinga_9000
 maintainer:      bazninethousand@gmail.com
 build-type:      Simple
 
-common warnings
+common shared-config
+    default-language: Haskell2010
     ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wmissing-home-modules -Widentities -Werror
+    default-extensions:
+        OverloadedStrings
+    build-depends:
+        base >= 4.14 && < 5,
+        relude,
+        text
+    mixins:
+        base hiding (Prelude),
+        relude (Relude as Prelude)
 
 library
-    import:           warnings
+    import:           shared-config
     hs-source-dirs:   src
-    default-language: Haskell2010
     build-tool-depends: alex:alex >= 3.2
                       , happy:happy >= 1.20
-    build-depends:    base
-                    , array
+    build-depends:    array
                     , mtl
                     , containers
                     , QuickCheck
@@ -36,22 +44,18 @@ library
                     , Evaluator.WeedNumber
 
 executable weed
-    import:           warnings
+    import:           shared-config
     main-is:          Main.hs
     hs-source-dirs:   app
-    default-language: Haskell2010
-    build-depends:    base
-                    , weed-lang
+    build-depends:    weed-lang
                     , haskeline
 
 test-suite test-weed
-    import:           warnings
+    import:           shared-config
     type:             exitcode-stdio-1.0
     main-is:          Tests.hs
     hs-source-dirs:   test
-    default-language: Haskell2010
-    build-depends:    base
-                    , weed-lang
+    build-depends:    weed-lang
                     , tasty
                     , tasty-hunit
                     , containers

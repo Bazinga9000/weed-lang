@@ -1,6 +1,6 @@
 module TypeChecker.Types where
 
-type TypeError = String
+type TypeError = Text
 
 -- functor: implemented by [], Dice, Pool
 -- monad: implemented by Dice, Pool

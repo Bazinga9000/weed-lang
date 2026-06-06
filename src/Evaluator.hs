@@ -1,10 +1,10 @@
 module Evaluator where
 
 import AST
-import Control.Monad.Except
-import Control.Monad.Reader
-import qualified Data.Map as Map
 -- TODO: clean up the cyclic dependency
+
+import Control.Monad.Except
+import qualified Data.Map as Map
 import {-# SOURCE #-} Evaluator.Builtins
 import Evaluator.Types
 import Evaluator.WeedNumber

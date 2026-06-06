@@ -1,0 +1,8 @@
+- group: { name: relude }
+- functions:
+    - { name: putStr, within: [] }
+    - { name: putStrLn, within: [] }
+    - { name: readFile, within: [] }
+    - { name: writeFile, within: [] }
+- warn: { lhs: foldl, rhs: foldl' }
+- ignore: { name: "Redundant do", within: "Tests.*" }
