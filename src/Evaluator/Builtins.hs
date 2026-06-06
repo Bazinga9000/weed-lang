@@ -239,23 +239,39 @@ fetchBuiltin rett Return = VBuiltin $ \v -> do
 fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
   env <- ask
 
-  let bindDice :: Roll Value -> Roll Value
-      bindDice d = do
-        v <- d
-        bound <- applyValueRoll env f v
-        case bound of
-          VDice d' -> d'
-          _ -> throwError $ InterpreterBug "Bind returned a non-dice value."
-
-  -- bind, like map, can inspect its input type
   case m of
     VList l -> do
       vs <- mapM (applyValue f) l
       VList . concat <$> mapM assertListE vs
-    VDice d -> return $ VDice $ bindDice d
+    VDice d -> return $ VDice $ do
+      v <- d
+      bound <- applyValueRoll env f v
+      case bound of
+        VDice d' -> d'
+        e -> throwError $ InterpreterBug $ "Bind returned a non-dice value. " <> displayObservable e
     VPool pool source -> do
-      let boundPool = pool >>= mapM (bindDice . return)
-      let boundSource = bindDice source
+      let boundPool :: Roll [Value]
+          boundPool = do
+            evalList <- pool
+            nestedLists <-
+              mapM
+                ( \val -> do
+                    bound <- applyValueRoll env f val
+                    case bound of
+                      VPool p _ -> p
+                      e -> throwError $ InterpreterBug $ "Bind (Pool) returned a non-pool value for the list. " <> displayObservable e
+                )
+                evalList
+            return (concat nestedLists)
+
+      let boundSource :: Roll Value
+          boundSource = do
+            val <- source
+            bound <- applyValueRoll env f val
+            case bound of
+              VPool _ s -> s
+              e -> throwError $ InterpreterBug $ "Bind (Pool) returned a non-pool value for the source. " <> displayObservable e
+
       return $ VPool boundPool boundSource
     _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> displayObservable m <> ">>=" <> displayObservable f <> ")"
 
