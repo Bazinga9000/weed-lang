@@ -11,12 +11,12 @@ Weed is statically typed with strict type inference.
 - **Lists `[a]`**: Homogeneous collections of type `a`.
 - **Functions `(a -> b)`**: First-class functions.
 - **Dice Monad `Dice a`**: Represents a random computation that, when sampled by the runtime framework, yields a value of type `a`.
-- **Dice Pool Monad `Pool a`**: As `Dice a`, but represents a collection of dice whose original generator can be tracked (for instance `d6 :: Dice Number`, but `4d6 :: Pool Number`) 
+- **Dice Pool Monad `Pool a`**: As `Dice a`, but represents a collection of dice equipped with a canonical generator for producing new values (for instance `d6 :: Dice Number`, but `4d6 :: Pool Number`). For primitive pools, the this generator is simply the source die which was repeatedly rolled to produce the pool, though after arbitrary transformations is is neither guaranteed that this generator is primitive, nor is it guaranteed that every die in the pool is the same as this generator. Internally, `Pool a` is stored as `(Dice [a], Dice a)`, with the first half being the actual pool and the right half being the generator.
 
 The following typeclasses exist:
 - **Functor `Functor d`**: Implemented by `[]`, `Dice`, and `Pool`, provides `fmap` for mapping over values of type `a` in `d a`.
 - **Monad `Monad d`**: Implemented by `[]`, `Dice`, and `Pool`, provides `return` and `>>=` for sequencing computations.
-- **Rollable `Rollable d`**: Implemented by `Dice` and `Pool`, provides `source :: Rollable d => d a -> Dice a` for extracting the original generating dice which extracts the single die which all rolls represented by the value share. For `Dice a`, `source` is the identity. For `Pool a`, `source` tracks the original generating die (for instance, `source 4d6 = d6`.)
+- **Rollable `Rollable d`**: Implemented by `Dice` and `Pool`, provides `source :: Rollable d => d a -> Dice a` for acquiring the canonical generator used to produce new values. For `Dice a`, `source` is the identity. For `Pool a`, `source` produces the tracked canonical generator. 
 
 ## Dice Syntax
 
@@ -89,19 +89,31 @@ Numbers in WEED are by default complex doubles. To construct complex literals, u
 
 Numerical primitives inside the execution layer carry tag metadata tracking their lineage (e.g., fields marking a number as `dropped` or was a critical success or failure). Built-in functions like `sum` natively scan this metadata to automatically omit numbers flagged as dropped from final calculations.
 
-the functions `critsOn :: Rollable r => (a -> Bool) -> r a -> r a` and `failsOn :: Rollable r => (a -> Bool) -> r a -> r a` apply a predicate to the dice result, marking it as a critical success or failure if it satisfies the predicate (primitive dice have reasonable defaults for critical success/failure detection). 
-
-The functions `dropped?`, `crit?` and `fail?`, all `Number -> Bool` functions, return `True` if the number is marked as dropped, critical success or failure respectively.
-
-Numbers *not* produced by dice are tagged with `pure` and can be queried with `pure?`. Pure numbers have no other metadata.
+Numbers *not* produced by dice are tagged with `pure` and can be queried with `isPure :: Number -> Bool`. Pure numbers have no other metadata.
 
 The metadata inheritance rules for operations are as follows.
 - Unary operations preserve the metadata of their operand.
 - For binary operations:
-  - If one of the operands is `pure?`, the result inherits the metadata of the other operand.
-  - If both operands are `pure?`, the result is `pure?` and has no other metadata.
-  - If neither operand is `pure?`, the result is `dropped?`/`crit?`/`fail?` if and only if both operands are.
-    * It is legal for a value to be both `crit?` and `fail?` simultaneously. In printed output, such a value is marked as both.
+  - If one of the operands `isPure`, the result inherits the metadata of the other operand.
+  - If both operands are `isPure`, the result `isPure` and has no other metadata.
+  - Otherwise, see the following table:
+  
+| Metadata         | Accessor Function (type `Number :: Bool`) | Inheritance Rule (`a ? b` has the tag if...) | Modifier                                                              | Special Properties                                                  | Default                                     |
+|------------------|-------------------------------------------|----------------------------------------------|-----------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------|
+| Dropped Value    | `isDropped`                               | `isDropped a` OR `isDropped b`               | Use `keep/drop` to keep or drop dice from Pools based on a predicate. | Can be cleared with `unDrop :: Number -> Number`. Ignored by `sum`. In repls, colored gray. | not `isDropped`                             |
+| Critical         | `isCrit`                                  | `isCrit a` OR `isCrit b`                     | `critsOn :: Rollable r => (Number -> Bool) -> r a -> r a`             | Displayed in REPLs with ★ and colored green.                        | Die dependent maximal value (if one exists) |
+| Perfect Critical | `isPerfectCrit`                           | `isPerfectCrit a` AND `isPrefectCrit b`      | Not modifiable separately, use `critsOn`.                             | Displayed in REPLs with ★★ and colored green.                       | N/A                                         |
+| Failure          | `isFail`                                  | `isFail a` OR `isFail b`                     | `failsOn :: Rollabe r => (Number -> Bool) -> r a -> r a`              | Displayed in REPLs with † and colored red.                          | Die dependent minimal value (if one exists) |
+| Total Failure    | `isTotalFail`                             | `isTotalFail a` AND `isTotalFail b`          | Not modifiable separately, use `failsOn`.                             | Displayed in REPLs with ‡ and colored red.                          | N/A                                         |
+| Extra            | `isExtraDie`                              | `isExtraDie a`  OR `isExtraDie b`            | N/A                                                                   | Displayed in REPLs with ! and colored purple.                       | Only producible with `explode`.             |
+
+*Note on crits and failures:* `isPerfectCrit` always implies `isCrit` and `isTotalFail` implies `isFail`.
+
+*Note on colors:* A value can only take one color at a time, so the following priority is applied:
+
+1. A value both `isCrit` and `isFail` (possible either manually, or with `d1`) will be colored yellow.
+2. A value that is exactly one of `isCrit` or `isFail` gets that color.
+3. `isExtraDie` values get their purple colors.
 
 ---
 
