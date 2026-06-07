@@ -93,7 +93,7 @@ instance PrettyPrintable CoreUntypedExpr where
   prettyPrint (CUList xs) = prettyPrint xs
   prettyPrint (CUIdentifier n) = prettyPrint n
   prettyPrint (CULambda n e) = "λ" <> prettyPrint n <> " -> " <> prettyPrint e
-  prettyPrint (CUApply e1 e2) = prettyPrint e1 <> " " <> prettyPrint e2
+  prettyPrint (CUApply e1 e2) = "(" <> prettyPrint e1 <> " " <> prettyPrint e2 <> ")"
   prettyPrint (CULet n e1 e2) = "let " <> prettyPrint n <> " = " <> prettyPrint e1 <> " in " <> prettyPrint e2
 
 instance PrettyPrintable CoreTypedExpr where
