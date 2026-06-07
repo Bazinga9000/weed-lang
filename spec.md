@@ -144,6 +144,7 @@ When the compiler lowers the surface AST into the core AST, expressions containi
 | `_ * _` | `\u1 -> \u2 -> u1 * u2` | Ordered left-to-right. |
 | `4d6 \| keep (highest _)` | `4d6 \| (\_u1 -> keep (highest _u1))` | Pipe barrier: The hole is isolated to the right limb. |
 | `map (_ * 2) [1, 2, 3]` | `map (\_u1 -> _u1 * 2) [1, 2, 3]` | Parenthetical Isolation: Parentheses confine the hole, passing a pure function directly into map. |
+| `map (foo _) [1, 2, 3]` | `\_u1 -> map (foo u1) [1, 2, 3]` | Parenthetical Non-Isolation: Parenthesis with no infix or pipe do *not* confine the hole. |
 | `let add = _ + _ in add 5 2` | `let add = \_u1 -> \_u2 -> _u1 + _u2 in add 5 2` | Let Binding: Captured instantly by the value definition. |
 
 --- 
