@@ -25,16 +25,19 @@ any1 = do
   tv <- fresh
   return $ ForAll [tv] [] (TVar tv ->> TVar tv)
 
-any2 :: Infer WeedTypeScheme
-any2 = do
-  tv <- fresh
-  return $ ForAll [tv] [] (TVar tv ->> TVar tv ->> TVar tv)
-
 dice1 :: Infer WeedTypeScheme
 dice1 = return $ noPoly (TNumber ->> mkDice TNumber)
 
 dice2 :: Infer WeedTypeScheme
 dice2 = return $ noPoly (TNumber ->> TNumber ->> mkDice TNumber)
+
+cmpNum :: Infer WeedTypeScheme
+cmpNum = return $ noPoly (TNumber ->> TNumber ->> TBool)
+
+cmpAny :: Infer WeedTypeScheme
+cmpAny = do
+  tv <- fresh
+  return $ ForAll [tv] [] (TVar tv ->> TVar tv ->> TBool)
 
 builtinType :: Builtin -> Infer WeedTypeScheme
 builtinType Negate = num1
@@ -47,12 +50,12 @@ builtinType Mod = num2
 builtinType Floor = num1
 builtinType Ceil = num1
 builtinType Pow = num2
-builtinType Eq = any2
-builtinType Neq = any2
-builtinType Le = num2
-builtinType Lt = num2
-builtinType Ge = num2
-builtinType Gt = num2
+builtinType Eq = cmpAny
+builtinType Neq = cmpAny
+builtinType Le = cmpNum
+builtinType Lt = cmpNum
+builtinType Ge = cmpNum
+builtinType Gt = cmpNum
 builtinType And = bool2
 builtinType Or = bool2
 builtinType Xor = bool2
