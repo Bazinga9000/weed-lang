@@ -67,7 +67,7 @@ bind n t
   -- check for infinite type: n occurs in t's free type variables
   | n `Set.member` ftv t = throwError $ "Infinite type: " <> show n <> " occurs in " <> show t
   -- otherwise, bind the variable to the type
-  | otherwise = return (Map.singleton n t)
+  | otherwise = return (one (n, t))
 
 unify' :: WeedType -> WeedType -> Either TypeError Subst
 unify' (a `TFunction` b) (a' `TFunction` b') = do
@@ -102,7 +102,7 @@ unifyPeek :: WeedType -> WeedType -> Infer Bool
 unifyPeek t1 t2 = do
   cs <- currentSubst <$> get
   let unifyResult = unify' (apply cs t1) (apply cs t2)
-  return $ either (const False) (const True) unifyResult
+  return $ isRight unifyResult
 
 instantiate :: WeedTypeScheme -> Infer WeedType
 instantiate (ForAll as cs t) = do

@@ -3,7 +3,7 @@ module Evaluator where
 import AST
 -- TODO: clean up the cyclic dependency
 
-import Control.Monad.Except
+import Control.Monad.Except (throwError)
 import qualified Data.Map as Map
 import {-# SOURCE #-} Evaluator.Builtins
 import Evaluator.Types

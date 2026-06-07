@@ -1,7 +1,6 @@
 module Parser.Lowerer where
 
 import AST
-import Control.Applicative
 import Control.Monad.RWS.CPS
 import qualified Data.List as L
 import qualified Data.Sequence as S

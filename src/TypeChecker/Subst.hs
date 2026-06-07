@@ -40,7 +40,7 @@ instance Substitutable WeedType where
   ftv TList = Set.empty
   ftv TDice = Set.empty
   ftv TPool = Set.empty
-  ftv (TVar n) = Set.singleton n
+  ftv (TVar n) = one n
   ftv (TApp a b) = ftv a `Set.union` ftv b
 
 instance Substitutable WeedTypeScheme where
