@@ -106,7 +106,7 @@ builtinType DiceCoin = return $ noPoly $ mkDice TBool
 builtinType DiceCircle = dice1
 builtinType Constant = do
   tv <- fresh
-  return $ noPoly (TVar tv ->> mkDice (TVar tv))
+  return $ ForAll [tv] [] (TVar tv ->> mkDice (TVar tv))
 builtinType Collapse = return $ noPoly (mkPool TNumber ->> mkDice TNumber)
 builtinType Source = do
   f <- fresh
@@ -116,5 +116,5 @@ builtinType Source = do
   return $ ForAll [f, a] [CInstanceOf CRollable tf] (TApp tf ta ->> mkDice tf)
 builtinType Poolify = do
   tv <- fresh
-  return $ noPoly (TNumber ->> mkDice tv ->> mkPool tv)
+  return $ ForAll [tv] [] (TNumber ->> mkDice (TVar tv) ->> mkPool (TVar tv))
 builtinType Sum = return $ noPoly (mkList TNumber ->> TNumber)
