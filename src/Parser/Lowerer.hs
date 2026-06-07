@@ -4,6 +4,7 @@ import AST
 import Control.Applicative
 import Control.Monad.RWS.CPS
 import qualified Data.List as L
+import qualified Data.Sequence as S
 import Prelude hiding (Ap, Identity, Sum)
 
 data LoweringError
@@ -60,19 +61,19 @@ desugarPoolify SHole = SHole
 ---
 
 -- type Lifter a = WriterT [Int] (StateT Int Lower) a
-type Lifter a = RWST () [Int] Int Lower a
+type Lifter a = RWST () (S.Seq Int) Int Lower a
 
 -- executes an action, captures any holes it emitted, and PREVENTS them
 -- from bubbling up any further with listen/censor.
-captureHoles :: Lifter a -> Lifter (a, [Int])
-captureHoles action = censor (const []) (listen action)
+captureHoles :: Lifter a -> Lifter (a, S.Seq Int)
+captureHoles action = censor (const S.empty) (listen action)
 
 liftHoles :: SurfaceExpr -> Lower SurfaceExpr
 liftHoles expr = do
   (finalExpr, _, unresolvedHoles) <- runRWST (liftExpr expr) () 1
 
   case unresolvedHoles of
-    [] -> Right finalExpr
+    S.Empty -> Right finalExpr
     _ ->
       if hasInfixOrPipe expr
         then Right (wrapLambdas unresolvedHoles finalExpr)
@@ -82,7 +83,7 @@ liftHoles expr = do
     liftExpr SHole = do
       holeId <- get
       modify (+ 1)
-      tell [holeId]
+      tell $ one holeId
       return $ SIdentifier (U holeId)
     liftExpr (SNumber n) = return $ SNumber n
     liftExpr (SBool b) = return $ SBool b
@@ -119,7 +120,7 @@ liftHoles expr = do
     liftExpr (SIf cond t branchF) =
       liftA3 SIf (liftExpr cond) (liftExpr t) (liftExpr branchF)
 
-    wrapLambdas :: [Int] -> SurfaceExpr -> SurfaceExpr
+    wrapLambdas :: S.Seq Int -> SurfaceExpr -> SurfaceExpr
     wrapLambdas holes e = foldr (SLambda . U) e holes
 
     -- intentionally stops at hole boundaries (parens, pipe, binop)
