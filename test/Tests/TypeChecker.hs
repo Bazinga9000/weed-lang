@@ -27,7 +27,7 @@ assertType expr expectedType = case typeCheck expr of
 
 assertTypeError :: CoreUntypedExpr -> Assertion
 assertTypeError expr = case typeCheck expr of
-  Left _ -> return ()
+  Left _ -> pass
   -- this one actually works without a toString because of inference! Yay!
   Right typedExpr -> assertFailure $ "Expected type error, but succeeded with type: " <> show (getType typedExpr)
 

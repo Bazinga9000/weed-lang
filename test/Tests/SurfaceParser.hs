@@ -56,9 +56,9 @@ surfaceParserTests =
                 TokenIdent "h"
               ]
               @?= SLetRec
-                [ Decl (S "f") $ (SLambda (S "x") (SIdentifier (S "x"))),
-                  Decl (S "g") $ (SIdentifier (S "f")),
-                  Decl (S "h") $ (SIdentifier (S "g"))
+                [ Decl (S "f") (SLambda (S "x") (SIdentifier (S "x"))),
+                  Decl (S "g") (SIdentifier (S "f")),
+                  Decl (S "h") (SIdentifier (S "g"))
                 ]
                 (SIdentifier (S "h")),
           testCase
