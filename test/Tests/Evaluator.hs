@@ -185,5 +185,32 @@ evaluatorTests =
 
             let expr = CTIf tDiceNum coinE d6E (cNum 0)
             assertNoError expr
+        ],
+      testGroup
+        "Recursive Evaluation"
+        [ testCase "even 4 -> True (Pure LetRec Evaluation)" $ do
+            let tNumToBool = TNumber ->> TBool
+            let tNumToNum = TNumber ->> TNumber
+
+            let ctEq = CTIdentifier (TNumber ->> TNumber ->> TBool) (B Eq)
+            let ctSub = CTIdentifier (TNumber ->> TNumber ->> TNumber) (B Sub)
+
+            let ctEvenCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (cNum 0)
+            let ctEvenSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (cNum 1)
+            let ctEvenBody = CTIf TBool ctEvenCond (CTBool True) (CTApply TBool (CTIdentifier tNumToBool (S "odd")) ctEvenSub)
+
+            let ctOddCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (cNum 0)
+            let ctOddSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (cNum 1)
+            let ctOddBody = CTIf TBool ctOddCond (CTBool False) (CTApply TBool (CTIdentifier tNumToBool (S "even")) ctOddSub)
+
+            let expr =
+                  CTLetRec
+                    TBool
+                    [ Decl (S "even") (CTLambda tNumToBool (S "n") ctEvenBody),
+                      Decl (S "odd") (CTLambda tNumToBool (S "n") ctOddBody)
+                    ]
+                    (CTApply TBool (CTIdentifier tNumToBool (S "even")) (cNum 4))
+
+            assertEval expr (VBool True)
         ]
     ]

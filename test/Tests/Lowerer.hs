@@ -161,7 +161,37 @@ testEndToEndLowering =
     [ testCase "map (_ + 1) [1] -> ((map (\\u1 -> ((Add u1) 1)) [1]) - Simple map" $
         let input = SApply (SApply (sId "map") (SParens (sAdd SHole (SNumber 1)))) (SList [SNumber 1])
             expected = cApp (cApp (cbId Map) (CULambda (U 1) (cApp (cApp (cbId Add) (cuId 1)) (CUNumber 1)))) (CUList [CUNumber 1])
-         in lower input @?= Right expected
+         in lower input @?= Right expected,
+      testCase "mutually recursive even and odd lower to correct CoreUntyped AST" $ do
+        -- even = \n -> if n == 0 then True else odd (n - 1)
+        let sEvenCond = SInfix "==" (sId "n") (SNumber 0)
+        let sEvenBody = SIf sEvenCond (SBool True) (SApply (sId "odd") (SInfix "-" (sId "n") (SNumber 1)))
+
+        -- odd = \n -> if n == 0 then False else even (n - 1)
+        let sOddCond = SInfix "==" (sId "n") (SNumber 0)
+        let sOddBody = SIf sOddCond (SBool False) (SApply (sId "even") (SInfix "-" (sId "n") (SNumber 1)))
+
+        let input =
+              SLetRec
+                [ Decl (S "even") (SLambda (S "n") sEvenBody),
+                  Decl (S "odd") (SLambda (S "n") sOddBody)
+                ]
+                (SApply (sId "even") (SNumber 4))
+
+        let cuEvenCond = cApp (cApp (cbId Eq) (cId "n")) (CUNumber 0)
+        let cuEvenBody = CUIf cuEvenCond (CUBool True) (cApp (cId "odd") (cApp (cApp (cbId Sub) (cId "n")) (CUNumber 1)))
+
+        let cuOddCond = cApp (cApp (cbId Eq) (cId "n")) (CUNumber 0)
+        let cuOddBody = CUIf cuOddCond (CUBool False) (cApp (cId "even") (cApp (cApp (cbId Sub) (cId "n")) (CUNumber 1)))
+
+        let expected =
+              CULetRec
+                [ Decl (S "even") (CULambda (S "n") cuEvenBody),
+                  Decl (S "odd") (CULambda (S "n") cuOddBody)
+                ]
+                (cApp (cId "even") (CUNumber 4))
+
+        lower input @?= Right expected
     ]
 
 lowererTests :: TestTree

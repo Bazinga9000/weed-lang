@@ -64,6 +64,12 @@ cuBind f = CUApply (CUApply (CUIdentifier (B Bind)) f)
 cuReturn :: CoreUntypedExpr -> CoreUntypedExpr
 cuReturn = CUApply (CUIdentifier (B Return))
 
+cubId :: Builtin -> CoreUntypedExpr
+cubId = CUIdentifier . B
+
+cuId :: String -> CoreUntypedExpr
+cuId = CUIdentifier . S
+
 typeCheckerTests :: TestTree
 typeCheckerTests =
   testGroup
@@ -165,6 +171,46 @@ typeCheckerTests =
           testCase "return 5 -> Type Error (Contextless return)" $
             assertTypeError
               (cuReturn (CUNumber 5))
+        ],
+      testGroup
+        "Mutual Recursion"
+        [ testCase "even and odd infer to (Number -> Bool) and evaluate to Bool" $ do
+            let cuEvenCond = CUApply (CUApply (cubId Eq) (cuId "n")) (CUNumber 0)
+            let cuEvenBody = CUIf cuEvenCond (CUBool True) (CUApply (cuId "odd") (CUApply (CUApply (cubId Sub) (cuId "n")) (CUNumber 1)))
+
+            let cuOddCond = CUApply (CUApply (cubId Eq) (cuId "n")) (CUNumber 0)
+            let cuOddBody = CUIf cuOddCond (CUBool False) (CUApply (cuId "even") (CUApply (CUApply (cubId Sub) (cuId "n")) (CUNumber 1)))
+
+            let inputCU =
+                  CULetRec
+                    [ Decl (S "even") (CULambda (S "n") cuEvenBody),
+                      Decl (S "odd") (CULambda (S "n") cuOddBody)
+                    ]
+                    (CUApply (cuId "even") (CUNumber 4))
+
+            let tNumToBool = TNumber ->> TBool
+            let tNumToNum = TNumber ->> TNumber
+
+            let ctEq = CTIdentifier (TNumber ->> TNumber ->> TBool) (B Eq)
+            let ctSub = CTIdentifier (TNumber ->> TNumber ->> TNumber) (B Sub)
+
+            let ctEvenCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (CTNumber 0)
+            let ctEvenSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (CTNumber 1)
+            let ctEvenBody = CTIf TBool ctEvenCond (CTBool True) (CTApply TBool (CTIdentifier tNumToBool (S "odd")) ctEvenSub)
+
+            let ctOddCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (CTNumber 0)
+            let ctOddSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (CTNumber 1)
+            let ctOddBody = CTIf TBool ctOddCond (CTBool False) (CTApply TBool (CTIdentifier tNumToBool (S "even")) ctOddSub)
+
+            let expectedCT =
+                  CTLetRec
+                    TBool
+                    [ Decl (S "even") (CTLambda tNumToBool (S "n") ctEvenBody),
+                      Decl (S "odd") (CTLambda tNumToBool (S "n") ctOddBody)
+                    ]
+                    (CTApply TBool (CTIdentifier tNumToBool (S "even")) (CTNumber 4))
+
+            typeCheck inputCU @?= Right expectedCT
         ],
       testGroup
         "Type Check Failures"
