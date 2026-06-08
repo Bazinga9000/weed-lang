@@ -59,7 +59,9 @@ instance Substitutable CoreTypedExpr where
   apply s (CTIdentifier t ident) = CTIdentifier (apply s t) ident
   apply s (CTLambda t ident body) = CTLambda (apply s t) ident (apply s body)
   apply s (CTApply t a b) = CTApply (apply s t) (apply s a) (apply s b)
-  apply s (CTLet t ident a b) = CTLet (apply s t) ident (apply s a) (apply s b)
+  apply s (CTLet t decl b) = CTLet (apply s t) (apply s decl) (apply s b)
+  apply s (CTLetRec t decls b) = CTLetRec (apply s t) (apply s decls) (apply s b)
+  apply s (CTIf ty c t f) = CTIf (apply s ty) (apply s c) (apply s t) (apply s f)
   apply s (CTMapPool t a b) = CTMapPool (apply s t) (apply s a) (apply s b)
 
   ftv (CTNumber _) = Set.empty
@@ -69,5 +71,7 @@ instance Substitutable CoreTypedExpr where
   ftv (CTIdentifier t _) = ftv t
   ftv (CTLambda t _ body) = ftv t `Set.union` ftv body
   ftv (CTApply t a b) = ftv t `Set.union` ftv a `Set.union` ftv b
-  ftv (CTLet t _ a b) = ftv t `Set.union` ftv a `Set.union` ftv b
+  ftv (CTLet t decl b) = ftv t `Set.union` ftv decl `Set.union` ftv b
+  ftv (CTLetRec t decls b) = ftv t `Set.union` ftv decls `Set.union` ftv b
+  ftv (CTIf ty c t f) = ftv ty `Set.union` ftv c `Set.union` ftv t `Set.union` ftv f
   ftv (CTMapPool t a b) = ftv t `Set.union` ftv a `Set.union` ftv b

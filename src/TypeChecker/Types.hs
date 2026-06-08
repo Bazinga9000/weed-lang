@@ -53,3 +53,15 @@ isDiceOrPool t = case t of
 
 data WeedTypeScheme = ForAll [TypeVarName] [TypeConstraint] WeedType
   deriving (Show)
+
+data ContextLvl = CtxBase | CtxDice | CtxPool deriving (Eq, Ord, Show)
+
+peelEffect :: WeedType -> (ContextLvl, WeedType)
+peelEffect (TApp TPool t) = (CtxPool, t)
+peelEffect (TApp TDice t) = (CtxDice, t)
+peelEffect t = (CtxBase, t)
+
+applyEffect :: ContextLvl -> WeedType -> WeedType
+applyEffect CtxPool t = TApp TPool t
+applyEffect CtxDice t = TApp TDice t
+applyEffect CtxBase t = t

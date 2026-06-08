@@ -59,9 +59,6 @@ builtinType Gt = cmpNum
 builtinType And = bool2
 builtinType Or = bool2
 builtinType Xor = bool2
-builtinType If = do
-  a <- fresh
-  return $ ForAll [a] [] (TBool ->> TVar a ->> TVar a ->> TVar a)
 builtinType Identity = any1
 builtinType Map = do
   f <- fresh

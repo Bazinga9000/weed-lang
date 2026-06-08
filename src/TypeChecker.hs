@@ -11,6 +11,25 @@ import TypeChecker.Subst
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum, lookupEnv)
 
+call1 :: Builtin -> WeedType -> CoreTypedExpr -> Infer (WeedType, CoreTypedExpr)
+call1 builtin argT argC = do
+  tb <- builtinType builtin >>= instantiate
+  trNew <- fresh
+  unify tb (argT ->> trNew)
+  let builtinNode = CTIdentifier tb (B builtin)
+  return (trNew, CTApply trNew builtinNode argC)
+
+call2 :: Builtin -> WeedType -> CoreTypedExpr -> WeedType -> CoreTypedExpr -> Infer (WeedType, CoreTypedExpr)
+call2 builtin argT1 argC1 argT2 argC2 = do
+  tb <- builtinType builtin >>= instantiate
+  tMiddle <- fresh
+  trNew <- fresh
+  unify tb (argT1 ->> tMiddle)
+  unify tMiddle (argT2 ->> trNew)
+  let builtinNode = CTIdentifier tb (B builtin)
+  let ap1 = CTApply tMiddle builtinNode argC1
+  return (trNew, CTApply trNew ap1 argC2)
+
 -- infer the type of an untyped expression,
 -- emitting all necesssary constraints for the solver to un
 infer :: CoreUntypedExpr -> Infer (WeedType, CoreTypedExpr)
@@ -51,27 +70,6 @@ infer (CUApply f arg) = do
   s <- currentSubst <$> get
   let tf' = apply s tf
   let ta' = apply s ta
-
-  -- Utilities for type coersion
-  -- Peek without modifying the current substitution
-
-  -- Instantiate, bind, and apply a unary builtin
-  let call1 builtin argT argC = do
-        tb <- builtinType builtin >>= instantiate
-        trNew <- fresh
-        unify tb (argT ->> trNew)
-        let builtinNode = CTIdentifier tb (B builtin)
-        return (trNew, CTApply trNew builtinNode argC)
-
-  let call2 builtin argT1 argC1 argT2 argC2 = do
-        tb <- builtinType builtin >>= instantiate
-        tMiddle <- fresh
-        trNew <- fresh
-        unify tb (argT1 ->> tMiddle)
-        unify tMiddle (argT2 ->> trNew)
-        let builtinNode = CTIdentifier tb (B builtin)
-        let ap1 = CTApply tMiddle builtinNode argC1
-        return (trNew, CTApply trNew ap1 argC2)
 
   -- attempt standard application
   case unify' tf' (ta' ->> tr) of
@@ -194,7 +192,7 @@ infer (CUApply f arg) = do
       firstJustM rules >>= \case
         Just result -> return result
         Nothing -> throwError origErr
-infer (CULet ident val body) = do
+infer (CULet (Decl ident val) body) = do
   -- infer the value and trap its class constraints
   ((tVal, typedVal), valConstraints) <- listen $ censor (const []) (infer val)
 
@@ -203,7 +201,117 @@ infer (CULet ident val body) = do
 
   -- extend the environment and infer the body
   (tBody, typedBody) <- inEnv (ident, scheme) (infer body)
-  return (tBody, CTLet tBody ident typedVal typedBody)
+  return (tBody, CTLet tBody (Decl ident typedVal) typedBody)
+infer (CULetRec decls body) = do
+  -- make the type schemes
+  let idents = map (\(Decl ident _) -> ident) decls
+  declVars <- traverse (const fresh) idents
+  let declSchemes = map (ForAll [] []) declVars
+  let cyclicBinds = zip idents declSchemes
+
+  -- infer the declaration bodies and collect ALL of their constraints together
+  let inEnvs binds action = foldr inEnv action binds
+  (declResults, declConstraints) <-
+    listen $
+      censor (const []) $
+        inEnvs cyclicBinds $
+          traverse (\(Decl _ expr) -> infer expr) decls
+
+  let declTypes = map fst declResults
+  let declCTExprs = map snd declResults
+
+  -- unify all the declaration vars with their inferred types
+  zipWithM_ unify declVars declTypes
+
+  -- apply all the substitutions, then generalize
+  subst <- currentSubst <$> get
+  let declTypes' = map (apply subst) declTypes
+  declSchemes' <- traverse (`generalize` declConstraints) declTypes'
+
+  -- infer the body in the generalized environment
+  let generalizedBinds = zip idents declSchemes'
+  (tBody, typedBody) <- inEnvs generalizedBinds (infer body)
+  let typedDecls = zipWith Decl idents declCTExprs
+  return (tBody, CTLetRec tBody typedDecls typedBody)
+infer (CUIf cond t f) = do
+  -- for future people who are asking why this is so complicated
+  -- morally, what we *should* be doing here is have a builtin If :: Bool -> a -> a -> a
+  -- and just desugar into that so we can leverage the function application coersions
+  -- and get all of the nice lifting logic like
+  -- (if coin then d6 else 0) :: Dice Number
+  -- for free, but if we do that, then because the langauge
+  -- has strictly evaluated function appplication, both t and f branches are evaluated
+  -- and this completely shatters recursion.
+  -- So, we have to basically cheat a little bit and do some coersion hacks in the
+  -- type checker here and then let the evaluator do the laziness
+
+  -- infer the condition, true, false branches
+  (tc, cc) <- infer cond
+  (tt, ct) <- infer t
+  (tf, cf) <- infer f
+
+  -- figure out what context we're in
+  cs <- currentSubst <$> get
+  let (lvlC, baseC) = peelEffect (apply cs tc)
+      (lvlT, baseT) = peelEffect (apply cs tt)
+      (lvlF, baseF) = peelEffect (apply cs tf)
+
+  -- the base type of the condition has to be bool
+  -- the base types of the branches have to match
+  unify baseC TBool
+  unify baseT baseF
+
+  cs' <- currentSubst <$> get
+  let finalBase = apply cs' baseT
+
+  -- simulate the CTApply coersions rule for two contexts
+  let joinLvl acc (lvl, baseT') =
+        if acc == CtxDice && lvl == CtxPool && baseT' == TNumber
+          then CtxDice
+          else max acc lvl
+
+  -- coerce the context left to right
+  let finalLvl =
+        CtxBase
+          `joinLvl` (lvlC, apply cs' baseC)
+          `joinLvl` (lvlT, finalBase)
+          `joinLvl` (lvlF, finalBase)
+
+  -- promote the outcome
+  let tPromoted = applyEffect finalLvl finalBase
+
+  -- coerce the branches into their correct types by injecting AST nodes
+  let coerceBranch branchT branchC = do
+        currSubst <- currentSubst <$> get
+        let (bLvl, bBase) = peelEffect (apply currSubst branchT)
+
+        -- 1. Explicit Pool Collapse
+        (tAfterCollapse, cAfterCollapse) <-
+          if finalLvl == CtxDice && bLvl == CtxPool && apply currSubst bBase == TNumber
+            then call1 Collapse branchT branchC
+            else return (branchT, branchC)
+
+        -- 2. Explicit Scalar Promotion
+        cs'' <- currentSubst <$> get
+        if finalLvl > CtxBase && fst (peelEffect (apply cs'' tAfterCollapse)) == CtxBase
+          then do
+            -- 1. Perform the return call to lift the scalar
+            (tRet, cRet) <- call1 Return tAfterCollapse cAfterCollapse
+
+            -- 2. Force the 'm' in 'm a' to be our target effect (Dice or Pool)
+            -- USE 'finalBase' from the outer scope, NOT peelEffect on tRet.
+            let target = applyEffect finalLvl finalBase
+            unify tRet target
+
+            return (tRet, cRet)
+          else return (tAfterCollapse, cAfterCollapse)
+
+  -- 3. Coerce condition and branches so the typed AST is explicitly wrapped
+  (_, ccCoerced) <- coerceBranch tc cc
+  (_, ctCoerced) <- coerceBranch tt ct
+  (_, cfCoerced) <- coerceBranch tf cf
+
+  return (tPromoted, CTIf tPromoted ccCoerced ctCoerced cfCoerced)
 
 -- solve the constraints generated by infer
 solve :: Subst -> [TypeConstraint] -> Either TypeError ()

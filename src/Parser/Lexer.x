@@ -34,6 +34,7 @@ tokens :-
   "]"                           { \_ -> TokenRBracket }
   ","                           { \_ -> TokenComma }
   "_"                           { \_ -> TokenHole }
+  ";"                           { \_ -> TokenSemi }
 
   -- hardcoded tokens
   "d%"                          { \_ -> TokenIdent "d%" }
@@ -50,7 +51,7 @@ tokens :-
 data Token
   = TokenIf | TokenThen | TokenElse | TokenLet | TokenIn
   | TokenArrow | TokenLambda | TokenHole
-  | TokenLParen | TokenRParen | TokenLBracket | TokenRBracket | TokenComma
+  | TokenLParen | TokenRParen | TokenLBracket | TokenRBracket | TokenComma | TokenSemi
   | TokenBool Bool
   | TokenNum Double
   | TokenIdent String

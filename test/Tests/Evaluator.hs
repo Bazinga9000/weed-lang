@@ -4,6 +4,7 @@ import AST
 import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
+import PrettyPrint
 import Test.Tasty
 import Test.Tasty.HUnit
 import TypeChecker.Types
@@ -27,15 +28,15 @@ assertEval :: CoreTypedExpr -> Value -> Assertion
 assertEval expr expected = case evalPreSample expr of
   Right actual ->
     if actual `eqObservable` expected
-      then return ()
+      then pass
       else
-        (assertFailure . toString) ("Expected " <> displayObservable expected <> ", got " <> displayObservable actual)
-  Left err -> (assertFailure . toString) (displayError err)
+        (assertFailure . toString) ("Expected " <> prettyPrint expected <> ", got " <> prettyPrint actual)
+  Left err -> (assertFailure . toString) (prettyPrint err)
 
 assertNoError :: CoreTypedExpr -> Assertion
 assertNoError expr = case evalPreSample expr of
-  Right _ -> return ()
-  Left err -> (assertFailure . toString) (displayError err)
+  Right _ -> pass
+  Left err -> (assertFailure . toString) (prettyPrint err)
 
 vNum :: Integer -> Value
 vNum n = VNumber (literal $ fromInteger n)
@@ -112,7 +113,7 @@ evaluatorTests =
         [ testCase "42 -> 42" $ do
             assertEval (cNum 42) (vNum 42),
           testCase "let x = 5 in x -> 5" $ do
-            let expr = CTLet TNumber idX (cNum 5) (CTIdentifier TNumber idX)
+            let expr = CTLet TNumber (Decl idX (cNum 5)) (CTIdentifier TNumber idX)
             assertEval expr (vNum 5),
           testCase "(\\x -> x) 10 -> 10" $ do
             let identityFunc = CTLambda (TFunction TNumber TNumber) idX (CTIdentifier TNumber idX)
@@ -147,5 +148,42 @@ evaluatorTests =
                         )
                     )
             assertNoError input
+        ],
+      testGroup
+        "Effectful If Expressions (CTIf)"
+        [ testCase "if True then 1 else 2 -> 1 (Basic Number If)" $ do
+            let expr = CTIf tNum (CTBool True) (cNum 1) (cNum 2)
+            assertEval expr (vNum 1),
+          testCase "if coin then 1 else 2 -> Evaluates (Dice Context)" $ do
+            let tDiceBool = mkDice TBool
+            let coinE = CTIdentifier tDiceBool (B DiceCoin)
+            let expr = CTIf tDiceNum coinE (cNum 1) (cNum 2)
+            assertNoError expr,
+          testCase "if 4coin then 1 else 2 -> Evaluates (Pool Context)" $ do
+            let tDiceBool = mkDice TBool
+            let tPoolBool = mkPool TBool
+
+            let poolifyT = TNumber ->> tDiceBool ->> tPoolBool
+            let poolifyE = CTIdentifier poolifyT (B Poolify)
+            let fourCoin =
+                  CTApply
+                    tPoolBool
+                    (CTApply (tDiceBool ->> tPoolBool) poolifyE (cNum 4))
+                    (CTIdentifier tDiceBool (B DiceCoin))
+
+            let expr = CTIf tPoolNum fourCoin (cNum 1) (cNum 2)
+            assertNoError expr,
+          testCase "if coin then d6 else 0 -> Evaluates (Dice Context - Simultaneous Promotion)" $ do
+            let tDiceBool = mkDice TBool
+            let coinE = CTIdentifier tDiceBool (B DiceCoin)
+
+            let d6E =
+                  CTApply
+                    tDiceNum
+                    (CTIdentifier (TNumber ->> tDiceNum) (B DiceD))
+                    (cNum 6)
+
+            let expr = CTIf tDiceNum coinE d6E (cNum 0)
+            assertNoError expr
         ]
     ]

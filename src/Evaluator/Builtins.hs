@@ -9,6 +9,7 @@ import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Numeric (Floating (log))
+import PrettyPrint
 import Test.QuickCheck.Gen
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
@@ -180,11 +181,6 @@ fetchBuiltin _ Gt = liftRealCmp Gt (>)
 fetchBuiltin _ And = liftBool2 (&&)
 fetchBuiltin _ Or = liftBool2 (||)
 fetchBuiltin _ Xor = liftBool2 (/=)
-fetchBuiltin _ If = VBuiltin $ \cond -> return $ VBuiltin $ \t -> return $ VBuiltin $ \f -> do
-  cond' <- assertBoolE cond
-  if cond'
-    then return t
-    else return f
 fetchBuiltin _ Identity = VBuiltin return
 fetchBuiltin _ Map = VBuiltin $ \f -> return $ VBuiltin $ \v -> do
   env <- ask
@@ -248,7 +244,7 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
       bound <- applyValueRoll env f v
       case bound of
         VDice d' -> d'
-        e -> throwError $ InterpreterBug $ "Bind returned a non-dice value. " <> displayObservable e
+        e -> throwError $ InterpreterBug $ "Bind returned a non-dice value. " <> prettyPrint e
     VPool pool source -> do
       let boundPool :: Roll [Value]
           boundPool = do
@@ -259,7 +255,7 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
                     bound <- applyValueRoll env f val
                     case bound of
                       VPool p _ -> p
-                      e -> throwError $ InterpreterBug $ "Bind (Pool) returned a non-pool value for the list. " <> displayObservable e
+                      e -> throwError $ InterpreterBug $ "Bind (Pool) returned a non-pool value for the list. " <> prettyPrint e
                 )
                 evalList
             return (concat nestedLists)
@@ -270,10 +266,10 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
             bound <- applyValueRoll env f val
             case bound of
               VPool _ s -> s
-              e -> throwError $ InterpreterBug $ "Bind (Pool) returned a non-pool value for the source. " <> displayObservable e
+              e -> throwError $ InterpreterBug $ "Bind (Pool) returned a non-pool value for the source. " <> prettyPrint e
 
       return $ VPool boundPool boundSource
-    _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> displayObservable m <> ">>=" <> displayObservable f <> ")"
+    _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> prettyPrint m <> ">>=" <> prettyPrint f <> ")"
 
 -- TODO: dice need criticality
 fetchBuiltin _ DiceD = onePosIntParam DiceD $ \i -> VNumber . literal . fromIntegral <$> chooseInt (1, i)

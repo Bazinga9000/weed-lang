@@ -55,7 +55,6 @@ instance PrettyPrintable Builtin where
   prettyPrint And = "(&&)"
   prettyPrint Or = "(||)"
   prettyPrint Xor = "xor"
-  prettyPrint If = "if"
   prettyPrint Identity = "id"
   prettyPrint Map = "map"
   prettyPrint Ap = "ap"
@@ -84,6 +83,9 @@ instance PrettyPrintable IdentifierName where
 instance (PrettyPrintable a) => PrettyPrintable [a] where
   prettyPrint xs = "[" <> T.intercalate ", " (map prettyPrint xs) <> "]"
 
+instance (PrettyPrintable a) => PrettyPrintable (Declaration a) where
+  prettyPrint (Decl name body) = prettyPrint name <> " = " <> prettyPrint body
+
 -- todo surface expr
 
 instance PrettyPrintable CoreUntypedExpr where
@@ -94,7 +96,9 @@ instance PrettyPrintable CoreUntypedExpr where
   prettyPrint (CUIdentifier n) = prettyPrint n
   prettyPrint (CULambda n e) = "λ" <> prettyPrint n <> " -> " <> prettyPrint e
   prettyPrint (CUApply e1 e2) = "(" <> prettyPrint e1 <> " " <> prettyPrint e2 <> ")"
-  prettyPrint (CULet n e1 e2) = "let " <> prettyPrint n <> " = " <> prettyPrint e1 <> " in " <> prettyPrint e2
+  prettyPrint (CULet decl e2) = "let " <> prettyPrint decl <> " in " <> prettyPrint e2
+  prettyPrint (CUIf e1 e2 e3) = "if " <> prettyPrint e1 <> " then " <> prettyPrint e2 <> " else " <> prettyPrint e3
+  prettyPrint (CULetRec decls e2) = "let " <> prettyPrint decls <> " in " <> prettyPrint e2
 
 instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTNumber n) = show n
@@ -104,7 +108,9 @@ instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTIdentifier t n) = "(" <> prettyPrint n <> "::" <> prettyPrint t <> ")"
   prettyPrint (CTLambda t ident body) = "(λ" <> prettyPrint ident <> "::" <> prettyPrint t <> " -> " <> prettyPrint body <> ")"
   prettyPrint (CTApply t a b) = "(apply :: " <> prettyPrint t <> " " <> prettyPrint a <> " " <> prettyPrint b <> ")"
-  prettyPrint (CTLet t ident expr body) = "(let " <> prettyPrint ident <> " = " <> prettyPrint expr <> " in " <> prettyPrint body <> "::" <> prettyPrint t <> ")"
+  prettyPrint (CTLet t decl e2) = "(let " <> prettyPrint decl <> " in " <> prettyPrint e2 <> " ::" <> prettyPrint t <> ")"
+  prettyPrint (CTLetRec t decls body) = "(let " <> prettyPrint decls <> " in " <> prettyPrint body <> "::" <> prettyPrint t <> ")"
+  prettyPrint (CTIf t cond tb fb) = "(if " <> prettyPrint cond <> " then " <> prettyPrint tb <> " else " <> prettyPrint fb <> "::" <> prettyPrint t <> ")"
   prettyPrint (CTMapPool t f pool) = "(map " <> prettyPrint f <> " " <> prettyPrint pool <> "::" <> prettyPrint t <> ")"
 
 instance PrettyPrintable Value where
@@ -123,6 +129,7 @@ instance PrettyPrintable EvaluationError where
   prettyPrint (DomainError b) = "Domain error: Builtin " <> prettyPrint b <> " expected real, got complex"
   prettyPrint (TypeError t v) = "Type error: Expected " <> prettyPrint t <> ", got " <> prettyPrint v
   prettyPrint (BadDieParameter b s v) = "Bad die parameter: " <> prettyPrint b <> " " <> s <> " , got " <> prettyPrint v
+  prettyPrint InfiniteRecursiveBinding = "Mutually recursive let block contained strictly evaluated bindings (would <<loop>>)"
   prettyPrint (InterpreterBug s) = "Interpreter bug: " <> s
 
 instance (PrettyPrintable l, PrettyPrintable r) => PrettyPrintable (Either l r) where
@@ -159,11 +166,28 @@ displayTypedAST e = unlines $ snd $ runWriter $ runReaderT (mkTree e) 0
       tellAtDepth ["|- application :: " <> prettyPrint t]
       local (+ 1) (mkTree e1)
       local (+ 1) (mkTree e2)
-    mkTree (CTLet t n e1 e2) = do
+    mkTree (CTLet t (Decl n e1) e2) = do
       tellAtDepth ["|- let " <> prettyPrint n <> " :: " <> prettyPrint t]
       local (+ 1) (mkTree e1)
       tellAtDepth ["|- in"]
       local (+ 1) (mkTree e2)
+    mkTree (CTLetRec t decls e2) = do
+      tellAtDepth ["|- let :: " <> prettyPrint t]
+      let mkDeclTree (Decl n e') =
+            ( do
+                tellAtDepth ["|- " <> prettyPrint n <> "="]
+                local (+ 1) (mkTree e')
+            )
+      mapM_ mkDeclTree decls
+      tellAtDepth ["|- in"]
+      local (+ 1) (mkTree e2)
+    mkTree (CTIf t e1 e2 e3) = do
+      tellAtDepth ["|- if :: " <> prettyPrint t]
+      local (+ 1) (mkTree e1)
+      tellAtDepth ["|- then"]
+      local (+ 1) (mkTree e2)
+      tellAtDepth ["|- else"]
+      local (+ 1) (mkTree e3)
     mkTree (CTMapPool t e1 e2) = do
       tellAtDepth ["|- mapPool :: " <> prettyPrint t]
       local (+ 1) (mkTree e1)

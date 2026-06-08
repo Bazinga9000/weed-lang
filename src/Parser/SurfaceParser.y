@@ -24,6 +24,7 @@ import AST
     '[' { TokenLBracket }
     ']' { TokenRBracket }
     ',' { TokenComma }
+    ';' { TokenSemi }
 
     num { TokenNum $$ }
     bool { TokenBool $$ }
@@ -99,9 +100,14 @@ Idents : ident        { [$1] }
 ListBody : Exp          { [$1]}
          | Exp ',' ListBody { $1 : $3 }
 
-Exp   : let ident '=' Exp in Exp     { SLet (S $2) $4 $6}
+LetDecl : ident '=' Exp    { Decl (S $1) $3 }
+
+LetDecls : LetDecl              { [$1] }
+         | LetDecl ';' LetDecls { $1 : $3 }
+
+Exp   : let LetDecls in Exp          { SLetRec $2 $4 }
       | if Exp then Exp else Exp     { SIf $2 $4 $6 }
-      | lam Idents '->' Exp { foldr (\v body -> SLambda (S v) body) $4 $2 }
+      | lam Idents '->' Exp          { foldr (\v body -> SLambda (S v) body) $4 $2 }
       -- fixity 10
       | App                          { $1 }
       -- fixity 9

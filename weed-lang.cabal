@@ -6,12 +6,19 @@ author:          Bazinga_9000
 maintainer:      bazninethousand@gmail.com
 build-type:      Simple
 
+flag dev
+  description: Disable warnings-as-errors for faster development
+  default: False
+  manual: True
+
 common shared-config
     default-language: Haskell2010
-    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wmissing-home-modules -Widentities -Werror
+    if !flag(dev)
+      ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wmissing-home-modules -Widentities -Werror
     default-extensions:
         OverloadedStrings
         FlexibleInstances
+        TupleSections
     build-depends:
         base >= 4.14 && < 5,
         relude,

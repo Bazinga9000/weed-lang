@@ -18,6 +18,9 @@ sAdd, sMul :: SurfaceExpr -> SurfaceExpr -> SurfaceExpr
 sAdd = SInfix "+"
 sMul = SInfix "*"
 
+sLet1 :: IdentifierName -> SurfaceExpr -> SurfaceExpr -> SurfaceExpr
+sLet1 ident binding = SLetRec [Decl ident binding]
+
 cId :: String -> CoreUntypedExpr
 cId = CUIdentifier . S
 
@@ -29,6 +32,26 @@ cbId = CUIdentifier . B
 
 cApp :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
 cApp = CUApply
+
+testCrackLets :: TestTree
+testCrackLets =
+  testGroup
+    "crackLets (Dependency Sorting)"
+    [ testCase "let x = 5; y = x + 2 in y -> let x = 5 in (let y = x + 2 in y)" $ do
+        let input =
+              SLetRec
+                [ Decl (S "x") (SNumber 5),
+                  Decl (S "y") (sAdd (sId "x") (SNumber 2))
+                ]
+                (sId "y")
+
+        let expected =
+              sLet1 (S "x") (SNumber 5) $
+                sLet1 (S "y") (sAdd (sId "x") (SNumber 2)) $
+                  sId "y"
+
+        crackLets input @?= expected
+    ]
 
 testDesugarPoolify :: TestTree
 testDesugarPoolify =
@@ -68,9 +91,9 @@ testHoleLifting =
             expected = SPipe (sId "4d6") (SLambda (U 1) (SApply (sId "keep") (SParens (SApply (sId "highest") (suId 1)))))
          in liftHoles input @?= Right expected,
       testCase "let foo = _ + _ in foo 5 2 -> let foo = (\\u1 u2 -> u1 + u2) in foo 5 2 - Let bindings capture immediately" $
-        let input = SLet (S "foo") (sAdd SHole SHole) (SApply (SApply (sId "foo") (SNumber 5)) (SNumber 2))
+        let input = sLet1 (S "foo") (sAdd SHole SHole) (SApply (SApply (sId "foo") (SNumber 5)) (SNumber 2))
             expected =
-              SLet
+              sLet1
                 (S "foo")
                 (SLambda (U 1) (SLambda (U 2) (sAdd (suId 1) (suId 2))))
                 (SApply (SApply (sId "foo") (SNumber 5)) (SNumber 2))
@@ -100,16 +123,16 @@ testBuiltinResolution =
             expected = sId "foo"
          in resolveBuiltins input @?= Right expected,
       testCase "let \"map\" = 1 in \"map\" unchanged - Respects shadowing in let" $
-        let input = SLet (S "map") (SNumber 1) (sId "map")
-            expected = SLet (S "map") (SNumber 1) (sId "map") -- Remains an S, not a B
+        let input = sLet1 (S "map") (SNumber 1) (sId "map")
+            expected = sLet1 (S "map") (SNumber 1) (sId "map") -- Remains an S, not a B
          in resolveBuiltins input @?= Right expected,
       testCase "(\\\"add\" -> \"add\" unchanged - Respects shadowing in lambdas" $
         let input = SLambda (S "add") (sId "add")
             expected = SLambda (S "add") (sId "add") -- Remains an S, not a B
          in resolveBuiltins input @?= Right expected,
       testCase "(let \"map\" = 1 in \"map\") + \"map\" -> (let \"map\" = 1 in \"map\") + Map - Shadowing scope does not leak" $
-        let input = sAdd (SLet (S "map") (SNumber 1) (sId "map")) (sId "map")
-            expected = sAdd (SLet (S "map") (SNumber 1) (sId "map")) (bId Map)
+        let input = sAdd (sLet1 (S "map") (SNumber 1) (sId "map")) (sId "map")
+            expected = sAdd (sLet1 (S "map") (SNumber 1) (sId "map")) (bId Map)
          in resolveBuiltins input @?= Right expected
     ]
 
@@ -128,10 +151,6 @@ testOperatorDissolving =
       testCase "x | f -> f x - Dissolves pipes into applications" $
         let input = SPipe (sId "x") (sId "f")
             expected = cApp (cId "f") (cId "x")
-         in dissolveOps input @?= Right expected,
-      testCase "if True 1 0 -> (((if True) 1) 0) - Dissolves if expressions into applications" $
-        let input = SIf (SBool True) (SNumber 1) (SNumber 0)
-            expected = cApp (cApp (cApp (cbId If) (CUBool True)) (CUNumber 1)) (CUNumber 0)
          in dissolveOps input @?= Right expected
     ]
 
@@ -149,7 +168,8 @@ lowererTests :: TestTree
 lowererTests =
   testGroup
     "Lowerer Tests"
-    [ testDesugarPoolify,
+    [ testCrackLets,
+      testDesugarPoolify,
       testHoleLifting,
       testBuiltinResolution,
       testOperatorDissolving,

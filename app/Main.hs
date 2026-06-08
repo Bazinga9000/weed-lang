@@ -1,10 +1,10 @@
 module Main where
 
 import Evaluator
-import Evaluator.Types (displayError, displayObservable)
 import Parser.Lexer
 import Parser.Lowerer
 import Parser.SurfaceParser
+import PrettyPrint
 import System.Console.Haskeline
 import TypeChecker
 
@@ -33,5 +33,5 @@ repl input = do
       Right coret -> do
         ev <- evaluate coret
         case ev of
-          Left err -> putTextLn $ "Evaluation error: " <> displayError err
-          Right v -> putTextLn $ displayObservable v
+          Left err -> putTextLn $ "Evaluation error: " <> prettyPrint err
+          Right v -> putTextLn $ prettyPrint v

@@ -8,6 +8,16 @@ data IdentifierName
   | B Builtin
   deriving (Show, Eq, Ord)
 
+data Declaration e = Decl IdentifierName e deriving (Eq, Show)
+
+instance Functor Declaration where
+  fmap f (Decl ident e) = Decl ident $ f e
+
+instance Foldable Declaration where
+  foldMap f (Decl _ x) = f x
+
+data Module a = Module [Declaration a] deriving (Eq, Show)
+
 isBuiltin :: IdentifierName -> Bool
 isBuiltin (B _) = True
 isBuiltin _ = False
@@ -35,7 +45,6 @@ data Builtin -- unary operators
     And
   | Or
   | Xor
-  | If
   | -- monads
     Identity
   | Map
@@ -73,9 +82,11 @@ data SurfaceExpr
   | SApply SurfaceExpr SurfaceExpr
   | SPipe SurfaceExpr SurfaceExpr -- seperate for hole lifting rules
   | SIf SurfaceExpr SurfaceExpr SurfaceExpr
-  | SLet IdentifierName SurfaceExpr SurfaceExpr
+  | SLetRec [Declaration SurfaceExpr] SurfaceExpr -- no SLet, becuase the Lowerer handles this
   | SHole
   deriving (Show, Eq)
+
+type SurfaceModule = Module SurfaceExpr
 
 data CoreUntypedExpr
   = CUNumber Double
@@ -85,8 +96,12 @@ data CoreUntypedExpr
   | CUIdentifier IdentifierName
   | CULambda IdentifierName CoreUntypedExpr
   | CUApply CoreUntypedExpr CoreUntypedExpr
-  | CULet IdentifierName CoreUntypedExpr CoreUntypedExpr
+  | CULet (Declaration CoreUntypedExpr) CoreUntypedExpr
+  | CULetRec [Declaration CoreUntypedExpr] CoreUntypedExpr
+  | CUIf CoreUntypedExpr CoreUntypedExpr CoreUntypedExpr
   deriving (Show, Eq)
+
+type CoreUntypedModule = Module CoreUntypedExpr
 
 data CoreTypedExpr
   = CTNumber Double
@@ -96,6 +111,10 @@ data CoreTypedExpr
   | CTIdentifier WeedType IdentifierName
   | CTLambda WeedType IdentifierName CoreTypedExpr
   | CTApply WeedType CoreTypedExpr CoreTypedExpr
-  | CTLet WeedType IdentifierName CoreTypedExpr CoreTypedExpr
+  | CTLet WeedType (Declaration CoreTypedExpr) CoreTypedExpr
+  | CTLetRec WeedType [Declaration CoreTypedExpr] CoreTypedExpr
+  | CTIf WeedType CoreTypedExpr CoreTypedExpr CoreTypedExpr
   | CTMapPool WeedType CoreTypedExpr CoreTypedExpr -- Maps ([a] -> b) over Pool a -> Dice b
   deriving (Show, Eq)
+
+type CoreTypedModule = Module CoreTypedExpr

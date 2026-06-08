@@ -16,6 +16,22 @@ data LoweringError
 type Lower = Either LoweringError
 
 ---
+-- Let binding toplogical sorting
+-- the parser, dumb and lazy as it is, outputs all let bindings
+-- as CULetRec. However, evaluating such bindings requires mFix
+-- which will fall into an infinite loop if things need to be evaluated
+-- strictly. To allow declarations like
+--
+-- let x = 1; y = x + y in y
+--
+-- which *should* evaluate just fine, we crack the big LetRec into nested Lets and LetRecs such that
+-- only values which *actually* mutually depend on each other go into the same LetRec block
+---
+
+crackLets :: SurfaceExpr -> SurfaceExpr
+crackLets = id -- not yet implemented :)
+
+---
 -- Primitive Pool desugaring
 -- converts concatenated dice pools into Poolify infixes
 -- 4d6 -> 4 # d6
@@ -50,7 +66,7 @@ desugarPoolify (SLambda ident body) = SLambda ident (desugarPoolify body)
 desugarPoolify (SApply e1 e2) = SApply (desugarPoolify e1) (desugarPoolify e2)
 desugarPoolify (SPipe e1 e2) = SPipe (desugarPoolify e1) (desugarPoolify e2)
 desugarPoolify (SIf c t f) = SIf (desugarPoolify c) (desugarPoolify t) (desugarPoolify f)
-desugarPoolify (SLet ident binding body) = SLet ident (desugarPoolify binding) (desugarPoolify body)
+desugarPoolify (SLetRec decls body) = SLetRec (map (fmap desugarPoolify) decls) (desugarPoolify body)
 desugarPoolify SHole = SHole
 
 ---
@@ -104,11 +120,16 @@ liftHoles expr = do
       (e1', h1) <- captureHoles (liftExpr e1)
       (e2', h2) <- captureHoles (liftExpr e2)
       return $ SPipe (wrapLambdas h1 e1') (wrapLambdas h2 e2')
-    liftExpr (SLet ident binding body) = do
-      -- let binding is a hole boundary
-      (binding', h1) <- captureHoles (liftExpr binding)
-      body' <- liftExpr body -- body holes bubble up naturally
-      return $ SLet ident (wrapLambdas h1 binding') body'
+    liftExpr (SLetRec decls body) = do
+      let liftDecl (Decl ident binding) =
+            ( do
+                -- let declarations are hole boundaries
+                (binding', h1) <- captureHoles (liftExpr binding)
+                return $ Decl ident (wrapLambdas h1 binding')
+            )
+
+      newDecls <- mapM liftDecl decls
+      SLetRec newDecls <$> liftExpr body
     liftExpr (SLambda ident body) = do
       -- lambdas are hole boundaries
       (body', h) <- captureHoles (liftExpr body)
@@ -193,14 +214,37 @@ resolveBuiltins expr = return $ runReader (resolveBuiltins' expr) []
     resolveBuiltins' (SApply e1 e2) = liftA2 SApply (resolveBuiltins' e1) (resolveBuiltins' e2)
     resolveBuiltins' (SPipe e1 e2) = liftA2 SPipe (resolveBuiltins' e1) (resolveBuiltins' e2)
     resolveBuiltins' (SIf cond t f) = liftA3 SIf (resolveBuiltins' cond) (resolveBuiltins' t) (resolveBuiltins' f)
-    resolveBuiltins' (SLet ident binding body) =
-      let res = liftA2 (SLet ident) (resolveBuiltins' binding) (resolveBuiltins' body)
-       in case ident of
-            (B _) -> res
-            (U _) -> res
-            (S s) -> do
-              ctx <- ask
-              if s `elem` ctx then res else local (s :) res
+    resolveBuiltins' (SLetRec decls body) = do
+      newDecls <- mapM resolveOne decls
+      newBody <- resolveBody body
+      return $ SLetRec newDecls newBody
+      where
+        resolveOne (Decl ident binding) =
+          let res = Decl ident <$> resolveBuiltins' binding
+           in case ident of
+                (B _) -> res
+                (U _) -> res
+                (S s) -> do
+                  ctx <- ask
+                  if s `elem` ctx then Decl ident <$> resolveBuiltins' binding else local (s :) res
+
+        resolveBody b = do
+          new <- fetchNewContext decls
+          local (new <>) (resolveBuiltins' b)
+
+        fetchNewContext [] = return []
+        fetchNewContext ((Decl (B _) _) : rest) = fetchNewContext rest
+        fetchNewContext ((Decl (U _) _) : rest) = fetchNewContext rest
+        fetchNewContext ((Decl (S s) _) : rest) = (s :) <$> fetchNewContext rest
+
+    -- resolveBuiltins' (SLetRec  ident binding body) =
+    --   let res = liftA2 (SLetRec  ident) (resolveBuiltins' binding) (resolveBuiltins' body)
+    --    in case ident of
+    --         (B _) -> res
+    --         (U _) -> res
+    --         (S s) -> do
+    --           ctx <- ask
+    --           if s `elem` ctx then res else local (s :) res
     resolveBuiltins' SHole = return SHole
 
 ---
@@ -235,7 +279,8 @@ binaryOpToBuiltin "#" = Right Poolify
 binaryOpToBuiltin s = Left $ BadBinaryOp s
 
 -- dissolves special nodes no longer required after hole resolution
--- deletes: SUnaryOp, SInfix, SParens, SPipe, SIf
+-- deletes: SUnaryOp, SInfix, SParens, SPipe
+-- sugars single-declaration SLetRec into CULet
 dissolveOps :: SurfaceExpr -> Lower CoreUntypedExpr
 dissolveOps (SNumber n) = return $ CUNumber n
 dissolveOps (SBool b) = return $ CUBool b
@@ -255,13 +300,14 @@ dissolveOps (SParens e) = dissolveOps e
 dissolveOps (SLambda ident body) = CULambda ident <$> dissolveOps body
 dissolveOps (SApply e1 e2) = liftA2 CUApply (dissolveOps e1) (dissolveOps e2)
 dissolveOps (SPipe e2 e1) = dissolveOps (SApply e1 e2)
-dissolveOps (SIf cond t f) = do
-  cond' <- dissolveOps cond
-  t' <- dissolveOps t
-  f' <- dissolveOps f
-  return $ CUApply (CUApply (CUApply (CUIdentifier (B If)) cond') t') f'
-dissolveOps (SLet ident binding body) = liftA2 (CULet ident) (dissolveOps binding) (dissolveOps body)
+dissolveOps (SIf cond t f) = liftA3 CUIf (dissolveOps cond) (dissolveOps t) (dissolveOps f)
+dissolveOps (SLetRec [Decl ident binding] body) = liftA2 CULet (Decl ident <$> dissolveOps binding) (dissolveOps body)
+dissolveOps (SLetRec decls body) = do
+  let dissolveDecl (Decl ident binding) = Decl ident <$> dissolveOps binding
+  newDecls <- mapM dissolveDecl decls
+  newBody <- dissolveOps body
+  return $ CULetRec newDecls newBody
 dissolveOps SHole = Left $ InterpreterBug "Hole survived hole resolution"
 
 lower :: SurfaceExpr -> Lower CoreUntypedExpr
-lower e = liftHoles (desugarPoolify e) >>= resolveBuiltins >>= dissolveOps
+lower e = e & crackLets & desugarPoolify & liftHoles >>= resolveBuiltins >>= dissolveOps

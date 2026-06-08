@@ -12,6 +12,9 @@ parse = parseSurface
 sMap :: SurfaceExpr -> SurfaceExpr -> SurfaceExpr
 sMap f = SApply (SApply (SIdentifier (S "map")) f)
 
+sLet1 :: IdentifierName -> SurfaceExpr -> SurfaceExpr -> SurfaceExpr
+sLet1 ident binding = SLetRec [Decl ident binding]
+
 surfaceParserTests :: TestTree
 surfaceParserTests =
   testGroup
@@ -31,9 +34,36 @@ surfaceParserTests =
         "Control Flow"
         [ testCase "let x = 5 in x - Parses let bindings" $
             parse [TokenLet, TokenIdent "x", TokenOp "=", TokenNum 5.0, TokenIn, TokenIdent "x"]
-              @?= SLet (S "x") (SNumber 5.0) (SIdentifier (S "x")),
-          testCase "if True then 1 else 0 - Parses conditional" $
-            parse [TokenIf, TokenBool True, TokenThen, TokenNum 1.0, TokenElse, TokenNum 0.0]
+              @?= sLet1 (S "x") (SNumber 5.0) (SIdentifier (S "x")),
+          testCase "let f = \\x -> x; g = f; h = g in h - Parses recursive let bindings" $
+            parse
+              [ TokenLet,
+                TokenIdent "f",
+                TokenOp "=",
+                TokenLambda,
+                TokenIdent "x",
+                TokenArrow,
+                TokenIdent "x",
+                TokenSemi,
+                TokenIdent "g",
+                TokenOp "=",
+                TokenIdent "f",
+                TokenSemi,
+                TokenIdent "h",
+                TokenOp "=",
+                TokenIdent "g",
+                TokenIn,
+                TokenIdent "h"
+              ]
+              @?= SLetRec
+                [ Decl (S "f") $ (SLambda (S "x") (SIdentifier (S "x"))),
+                  Decl (S "g") $ (SIdentifier (S "f")),
+                  Decl (S "h") $ (SIdentifier (S "g"))
+                ]
+                (SIdentifier (S "h")),
+          testCase
+            "if True then 1 else 0 - Parses conditional"
+            $ parse [TokenIf, TokenBool True, TokenThen, TokenNum 1.0, TokenElse, TokenNum 0.0]
               @?= SIf (SBool True) (SNumber 1.0) (SNumber 0.0)
         ],
       testGroup
@@ -62,6 +92,15 @@ surfaceParserTests =
           testCase "4d6 - Parses dice correctly" $
             -- the desugaring is done in the lowering step
             -- the desugaring is done in the lowering step
+            -- the desugaring is done in the lowering step
+            -- the desugaring is done in the lowering step
+
+            -- the desugaring is done in the lowering step
+
+            -- the desugaring is done in the lowering step
+
+            -- the desugaring is done in the lowering step
+            -- the desugaring is done in the lowering step
 
             -- the desugaring is done in the lowering step
             parse [TokenNum 4.0, TokenBuiltin DiceD, TokenNum 6.0]
@@ -70,6 +109,15 @@ surfaceParserTests =
             parse [TokenNum 3.0, TokenOp "|", TokenHole, TokenOp "+", TokenNum 5.0]
               @?= SPipe (SNumber 3.0) (SInfix "+" SHole (SNumber 5.0)),
           testCase "4 # d6 - Parses pool hash operator" $
+            -- # has fixity 5, Application has fixity 10
+            -- # has fixity 5, Application has fixity 10
+            -- # has fixity 5, Application has fixity 10
+            -- # has fixity 5, Application has fixity 10
+
+            -- # has fixity 5, Application has fixity 10
+
+            -- # has fixity 5, Application has fixity 10
+
             -- # has fixity 5, Application has fixity 10
             -- # has fixity 5, Application has fixity 10
 

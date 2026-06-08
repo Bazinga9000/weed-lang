@@ -4,6 +4,7 @@ import AST
 -- TODO: clean up the cyclic dependency
 
 import Control.Monad.Except (throwError)
+-- import Control.Monad.Fix
 import qualified Data.Map as Map
 import {-# SOURCE #-} Evaluator.Builtins
 import Evaluator.Types
@@ -45,9 +46,58 @@ eval (CTApply _ func arg) = do
   func' <- eval func
   arg' <- eval arg
   applyValue func' arg'
-eval (CTLet _ ident expr body) = do
+eval (CTLet _ (Decl ident expr) body) = do
   expr' <- eval expr
   local (\e -> e `extend` (ident, expr')) $ eval body
+eval (CTLetRec _ decls body) = do
+  parentEnv <- ask
+  let idents = map (\(Decl ident _) -> ident) decls
+
+  -- in a strict evaluator, recursive bindings MUST be lambdas.
+  -- if they aren't, it's an illegal cycle that would cause an infinite loop.
+  let getLambda (Decl _ (CTLambda _ arg argBody)) = Just (arg, argBody)
+      getLambda _ = Nothing
+
+  case traverse getLambda decls of
+    Nothing ->
+      throwError InfiniteRecursiveBinding
+    Just lambdaParts -> do
+      -- construct the environment recursively
+      let recEnv = foldr (\(k, v) acc -> Map.insert k v acc) parentEnv (zip idents closures)
+          closures = map (uncurry (VClosure recEnv)) lambdaParts
+
+      -- evaluate the body in the combined recursive environment
+      local (const recEnv) (eval body)
+eval (CTIf _ cond t f) = do
+  cond' <- eval cond
+  env <- ask
+
+  -- eval a branch inside the Roll monad
+  let runBranch :: CoreTypedExpr -> Roll Value
+      runBranch branchExpr = case runEval env (eval branchExpr) of
+        Left err -> throwError err
+        Right v -> return v
+
+  -- run a conditional in a die
+  let runCond :: Value -> Roll Value
+      runCond dBool = case dBool of
+        VBool True -> runBranch t
+        VBool False -> runBranch f
+        _ -> throwError $ InterpreterBug "If condition was a Die that did not produce a Boolean"
+
+  case cond' of
+    -- the trivial cases
+    VBool True -> eval t
+    VBool False -> eval f
+    -- the dice
+    VDice d -> return $ VDice $ d >>= runCond
+    VPool p s -> return $ VPool p' s'
+      where
+        s' = s >>= runCond
+        p' = do
+          vs <- p
+          mapM runCond vs
+    _ -> throwError $ InterpreterBug "Evaluator got a non-boolean condition"
 eval (CTMapPool _ f p) = do
   f' <- eval f
   p' <- eval p
