@@ -71,6 +71,12 @@ wnCeil = lift1WN $ negate . complexFloor . negate
 wnMod :: WeedNumber -> WeedNumber -> WeedNumber
 wnMod = lift2WN $ \a b -> a - b * complexFloor (a / b)
 
+wnCAdd :: WeedNumber -> WeedNumber -> WeedNumber
+wnCAdd = lift2WN $ \a b -> a + b * (0 :+ 1)
+
+wnCSub :: WeedNumber -> WeedNumber -> WeedNumber
+wnCSub = lift2WN $ \a b -> a + b * (0 :+ (-1))
+
 infix 4 =~=
 
 (=~=) :: WeedNumber -> WeedNumber -> Bool

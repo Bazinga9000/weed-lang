@@ -169,6 +169,8 @@ fetchBuiltin _ Mod = liftValue2 $ \d d' -> do
     else
       return $ VNumber (n `wnMod` n')
 fetchBuiltin _ Pow = liftNumber2 (**)
+fetchBuiltin _ ComplexAdd = liftNumber2 wnCAdd
+fetchBuiltin _ ComplexSub = liftNumber2 wnCSub
 fetchBuiltin _ Floor = liftNumber wnFloor
 fetchBuiltin _ Ceil = liftNumber wnCeil
 fetchBuiltin _ Eq = liftValue2 equality

@@ -34,6 +34,8 @@ data Builtin -- unary operators
   | Pow
   | Floor
   | Ceil
+  | ComplexAdd
+  | ComplexSub
   | -- comparison operations
     Eq
   | Neq

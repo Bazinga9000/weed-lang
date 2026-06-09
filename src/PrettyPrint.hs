@@ -43,6 +43,8 @@ instance PrettyPrintable Builtin where
   prettyPrint Mul = "(*)"
   prettyPrint Div = "(/)"
   prettyPrint Mod = "(%)"
+  prettyPrint ComplexAdd = "(:+)"
+  prettyPrint ComplexSub = "(:-)"
   prettyPrint Floor = "floor"
   prettyPrint Ceil = "ceil"
   prettyPrint Pow = "(^)"

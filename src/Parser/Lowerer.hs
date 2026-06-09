@@ -300,6 +300,8 @@ binaryOpToBuiltin "*" = Right Mul
 binaryOpToBuiltin "/" = Right Div
 binaryOpToBuiltin "%" = Right Mod
 binaryOpToBuiltin "^" = Right Pow
+binaryOpToBuiltin ":+" = Right ComplexAdd
+binaryOpToBuiltin ":-" = Right ComplexSub
 binaryOpToBuiltin "==" = Right Eq
 binaryOpToBuiltin "/=" = Right Neq
 binaryOpToBuiltin "!=" = Right Neq -- I know, I know.
