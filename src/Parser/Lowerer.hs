@@ -2,6 +2,7 @@ module Parser.Lowerer where
 
 import AST
 import Control.Monad.RWS.CPS
+import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.List as L
 import qualified Data.Sequence as S
 import Prelude hiding (Ap, Identity, Sum)
@@ -29,7 +30,43 @@ type Lower = Either LoweringError
 ---
 
 crackLets :: SurfaceExpr -> SurfaceExpr
-crackLets = id -- not yet implemented :)
+crackLets (SNumber n) = SNumber n
+crackLets (SBool b) = SBool b
+crackLets SUnit = SUnit
+crackLets (SList es) = SList $ crackLets <$> es
+crackLets (SIdentifier ident) = SIdentifier ident
+crackLets (SUnaryOp op e) = SUnaryOp op $ crackLets e
+crackLets (SInfix op e1 e2) = SInfix op (crackLets e1) $ crackLets e2
+crackLets (SParens e) = SParens $ crackLets e
+crackLets (SLambda ident body) = SLambda ident $ crackLets body
+crackLets (SApply e1 e2) = SApply (crackLets e1) (crackLets e2)
+crackLets (SPipe e1 e2) = SPipe (crackLets e1) (crackLets e2)
+crackLets (SIf c t f) = SIf (crackLets c) (crackLets t) (crackLets f)
+crackLets SHole = SHole
+crackLets (SLetRec decls finalBody) = foldr buildLet finalBody sccs
+  where
+    crackedDecls = map (\(Decl n e) -> Decl n $ crackLets e) decls
+    graphNodes = [(decl, name, fv expr) | decl@(Decl name expr) <- crackedDecls]
+    sccs = stronglyConnComp graphNodes
+
+    buildLet :: SCC (Declaration SurfaceExpr) -> SurfaceExpr -> SurfaceExpr
+    buildLet (AcyclicSCC decl) body = SLetRec [decl] body
+    buildLet (CyclicSCC decls') body = SLetRec decls' body
+
+    fv (SIdentifier ident) = [ident]
+    fv (SList es) = es >>= fv
+    fv (SUnaryOp _ e) = fv e
+    fv (SInfix _ e1 e2) = fv e1 <> fv e2
+    fv (SParens e) = fv e
+    fv (SLambda ident body) = [x | x <- fv body, x /= ident]
+    fv (SApply e1 e2) = fv e1 <> fv e2
+    fv (SPipe e1 e2) = fv e1 <> fv e2
+    fv (SIf c t f) = fv c <> fv t <> fv f
+    fv (SLetRec decls' body) = [x | x <- allFvs, x `notElem` boundNames]
+      where
+        boundNames = [n | Decl n _ <- decls']
+        allFvs = fv body <> concatMap (\(Decl _ e) -> fv e) decls'
+    fv _ = []
 
 ---
 -- Primitive Pool desugaring
