@@ -50,6 +50,7 @@ library
                     , Evaluator.Types
                     , Evaluator.Builtins
                     , Evaluator.WeedNumber
+                    , Evaluator.Metadata
 
 executable weed
     import:           shared-config

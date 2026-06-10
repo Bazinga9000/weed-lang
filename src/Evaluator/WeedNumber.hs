@@ -1,24 +1,26 @@
 module Evaluator.WeedNumber where
 
 import Data.Complex
+import Evaluator.Metadata
 import Numeric (Floating (log))
 
-newtype WeedNumber = WeedNumber
-  { value :: Complex Double
+data WeedNumber = WeedNumber
+  { value :: Complex Double,
+    metadata :: Maybe NumberMetadata
   }
   deriving (Show)
 
 literal :: Double -> WeedNumber
-literal x = WeedNumber {value = x :+ 0}
+literal x = WeedNumber {value = x :+ 0, metadata = Nothing}
 
 complexLiteral :: Double -> Double -> WeedNumber
-complexLiteral x y = WeedNumber {value = x :+ y}
+complexLiteral x y = WeedNumber {value = x :+ y, metadata = Nothing}
 
 lift1WN :: (Complex Double -> Complex Double) -> WeedNumber -> WeedNumber
-lift1WN f x = WeedNumber {value = f (value x)}
+lift1WN f x = WeedNumber {value = f (value x), metadata = metadata x}
 
 lift2WN :: (Complex Double -> Complex Double -> Complex Double) -> WeedNumber -> WeedNumber -> WeedNumber
-lift2WN f x y = WeedNumber {value = f (value x) (value y)}
+lift2WN f x y = WeedNumber {value = f (value x) (value y), metadata = metadata x <> metadata y}
 
 complexFloor :: Complex Double -> Complex Double
 complexFloor (r :+ i)
@@ -81,3 +83,11 @@ infix 4 =~=
 
 (=~=) :: WeedNumber -> WeedNumber -> Bool
 (=~=) a b = value a == value b
+
+--- metadata related functions
+
+wnLiftMeta :: (NumberMetadata -> NumberMetadata) -> WeedNumber -> WeedNumber
+wnLiftMeta f n = n {metadata = f <$> metadata n}
+
+wnIsPure :: WeedNumber -> Bool
+wnIsPure = isNothing . metadata
