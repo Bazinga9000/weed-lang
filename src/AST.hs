@@ -16,7 +16,7 @@ instance Functor Declaration where
 instance Foldable Declaration where
   foldMap f (Decl _ x) = f x
 
-data Module a = Module [Declaration a] deriving (Eq, Show)
+newtype Module a = Module [Declaration a] deriving (Eq, Show)
 
 isBuiltin :: IdentifierName -> Bool
 isBuiltin (B _) = True
