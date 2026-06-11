@@ -25,7 +25,6 @@ common shared-config
         text
     mixins:
         base hiding (Prelude),
-        relude (Relude as Prelude)
 
 library
     import:           shared-config
@@ -36,7 +35,8 @@ library
                     , mtl
                     , containers
                     , QuickCheck
-    exposed-modules:  AST
+    exposed-modules:  Prelude
+                    , AST
                     , PrettyPrint
                     , Parser.Lexer
                     , Parser.SurfaceParser
