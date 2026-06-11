@@ -15,8 +15,8 @@ main = runInputT defaultSettings loop
     loop = do
       minput <- getInputLine "weed> "
       case minput of
-        Nothing -> return ()
-        Just "exit" -> return ()
+        Nothing -> pass
+        Just "exit" -> pass
         Just input -> do
           liftIO $ repl input
           loop
