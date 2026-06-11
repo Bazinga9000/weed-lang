@@ -1,6 +1,7 @@
 module Main where
 
 import Evaluator
+import Formatting.ANSI
 import Parser.Lexer
 import Parser.Lowerer
 import Parser.SurfaceParser
@@ -13,7 +14,8 @@ main = runInputT defaultSettings loop
   where
     loop :: InputT IO ()
     loop = do
-      minput <- getInputLine "weed> "
+      let weedText = ansiFormatString Green Normal "weed> "
+      minput <- getInputLine $ toString weedText
       case minput of
         Nothing -> pass
         Just "exit" -> pass

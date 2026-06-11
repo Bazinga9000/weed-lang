@@ -51,6 +51,7 @@ library
                     , Evaluator.Builtins
                     , Evaluator.WeedNumber
                     , Evaluator.Metadata
+                    , Formatting.ANSI
 
 executable weed
     import:           shared-config
