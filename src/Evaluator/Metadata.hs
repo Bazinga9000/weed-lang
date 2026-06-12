@@ -17,13 +17,12 @@ instance Monoid Multibool where
   mempty = Multibool (0, 0)
 
 -- this is what's ultimately displayed, it "forgets" the actual counts and just gives
--- 1 mark for single-die crits OR >= 2 dice with at least one crit
--- 2 marks for >= 2 dice, all crits
--- 0 marks for no crits
--- this is also how you interface with criticality in the stdlib
-data CriticalityMark = NoMark | OneMark | TwoMarks deriving (Eq, Show, Ord, Enum, Bounded)
+-- NoMark - zero trues, any number of falses
+-- OneMark - exactly one true, no falses OR at least one of both true and false
+-- TwoMarks - more than one true, no falses
+data MultiboolMark = NoMark | OneMark | TwoMarks deriving (Eq, Show, Ord, Enum, Bounded)
 
-getMark :: Multibool -> CriticalityMark
+getMark :: Multibool -> MultiboolMark
 getMark (Multibool (0, _)) = NoMark
 getMark (Multibool (1, 0)) = OneMark
 getMark (Multibool (_, 0)) = TwoMarks
