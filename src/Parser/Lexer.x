@@ -3,6 +3,8 @@ module Parser.Lexer (Token(..), scanTokens) where
 import AST (Builtin(..))
 import Data.Char (isDigit)
 import Text.Read (read)
+import TowerNumber.Core (TowerNumber)
+import TowerNumber.Parse (parseTN)
 
 }
 
@@ -41,7 +43,7 @@ tokens :-
 
   -- identifiers & literals
   True|False                    { \s -> TokenBool (read s) }
-  $digit+ (\. $digit+)?         { \s -> TokenNum (read s) }
+  $digit+ (\. $digit+)?         { \s -> TokenNum (parseTN s) }
   $alpha [$alpha $digit \_]* { \s -> TokenIdent s }
 
   -- operators
@@ -53,7 +55,7 @@ data Token
   | TokenArrow | TokenLambda | TokenHole
   | TokenLParen | TokenRParen | TokenLBracket | TokenRBracket | TokenComma | TokenSemi
   | TokenBool Bool
-  | TokenNum Double
+  | TokenNum TowerNumber
   | TokenIdent String
   | TokenOp String
   | TokenBuiltin Builtin
@@ -84,19 +86,19 @@ refineTokens (TokenIdent s : ts) = case s of
   "d%" -> TokenBuiltin DiceD : TokenNum 100 : refineTokens ts
   "dF" -> TokenBuiltin DiceF : TokenNum 1 : refineTokens ts
   ('d':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceD : TokenNum (read rest) : refineTokens ts
+      TokenBuiltin DiceD : TokenNum (parseTN rest) : refineTokens ts
   ('u':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceU : TokenNum (read rest) : refineTokens ts
+      TokenBuiltin DiceU : TokenNum (parseTN rest) : refineTokens ts
   ('f':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceF : TokenNum (read rest) : refineTokens ts
+      TokenBuiltin DiceF : TokenNum (parseTN rest) : refineTokens ts
   ('g':'a':'u':'s':'s':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceGauss : TokenNum (read rest) : refineTokens ts
+      TokenBuiltin DiceGauss : TokenNum (parseTN rest) : refineTokens ts
   ('p':'a':'r':'e':'t':'o':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DicePareto : TokenNum (read rest) : refineTokens ts
+      TokenBuiltin DicePareto : TokenNum (parseTN rest) : refineTokens ts
   ('b':'i':'n':'o':'m':'i':'a':'l':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceBinomial : TokenNum (read rest) : refineTokens ts
+      TokenBuiltin DiceBinomial : TokenNum (parseTN rest) : refineTokens ts
   ('c':'i':'r':'c':'l':'e':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceCircle : TokenNum (read rest) : refineTokens ts
+      TokenBuiltin DiceCircle : TokenNum (parseTN rest) : refineTokens ts
 
   -- just an identifier
   _        -> TokenIdent s : refineTokens ts

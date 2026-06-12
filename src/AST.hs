@@ -1,5 +1,6 @@
 module AST where
 
+import TowerNumber.Core (TowerNumber)
 import TypeChecker.Types
 
 data IdentifierName
@@ -72,7 +73,7 @@ data Builtin -- unary operators
   deriving (Show, Eq, Ord)
 
 data SurfaceExpr
-  = SNumber Double
+  = SNumber TowerNumber
   | SBool Bool
   | SUnit
   | SList [SurfaceExpr]
@@ -91,7 +92,7 @@ data SurfaceExpr
 type SurfaceModule = Module SurfaceExpr
 
 data CoreUntypedExpr
-  = CUNumber Double
+  = CUNumber TowerNumber
   | CUBool Bool
   | CUUnit
   | CUList [CoreUntypedExpr]
@@ -106,7 +107,7 @@ data CoreUntypedExpr
 type CoreUntypedModule = Module CoreUntypedExpr
 
 data CoreTypedExpr
-  = CTNumber Double
+  = CTNumber TowerNumber
   | CTBool Bool
   | CTUnit
   | CTList WeedType [CoreTypedExpr]

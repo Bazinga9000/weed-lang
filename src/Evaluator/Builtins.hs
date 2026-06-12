@@ -11,39 +11,36 @@ import Evaluator.WeedNumber
 import Numeric (Floating (log))
 import PrettyPrint
 import Test.QuickCheck.Gen
+import TowerNumber.Core
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
 
-assertNumber :: Value -> Roll WeedNumber
+assertNumber :: (MonadError EvaluationError m) => Value -> m WeedNumber
 assertNumber (VNumber n) = return n
 assertNumber e = throwError $ TypeError TNumber e
 
-assertNumberE :: Value -> Eval WeedNumber
-assertNumberE (VNumber n) = return n
-assertNumberE e = throwError $ TypeError TNumber e
+assertReal :: (MonadError EvaluationError m) => Builtin -> Value -> m Double
+assertReal builtin (VNumber wn) = do
+  case tnIntoDouble (value wn) of
+    Just r -> return r
+    Nothing -> throwError $ DomainError builtin
+assertReal _ e = throwError $ TypeError TNumber e
 
-assertRealE :: Builtin -> Value -> Eval Double
-assertRealE builtin (VNumber wn) = do
-  let real = realPart $ value wn
-  let imag = imagPart $ value wn
-  if imag == 0 then return real else throwError $ DomainError builtin
-assertRealE _ e = throwError $ TypeError TNumber e
+assertBool :: (MonadError EvaluationError m) => Value -> m Bool
+assertBool (VBool b) = return b
+assertBool e = throwError $ TypeError TBool e
 
-assertBoolE :: Value -> Eval Bool
-assertBoolE (VBool b) = return b
-assertBoolE e = throwError $ TypeError TBool e
+assertList :: (MonadError EvaluationError m) => Value -> m [Value]
+assertList (VList xs) = return xs
+assertList e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
 
-assertListE :: Value -> Eval [Value]
-assertListE (VList xs) = return xs
-assertListE e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
+assertDice :: (MonadError EvaluationError m) => Value -> m (Roll Value)
+assertDice (VDice r) = return r
+assertDice e = throwError $ TypeError TDice e
 
-assertDiceE :: Value -> Eval (Roll Value)
-assertDiceE (VDice r) = return r
-assertDiceE e = throwError $ TypeError TDice e
-
-assertPoolE :: Value -> Eval (Roll [Value], Roll Value)
-assertPoolE (VPool r s) = return (r, s)
-assertPoolE e = throwError $ TypeError TPool e
+assertPool :: (MonadError EvaluationError m) => Value -> m (Roll [Value], Roll Value)
+assertPool (VPool r s) = return (r, s)
+assertPool e = throwError $ TypeError TPool e
 
 --
 -- Helper functions to lift functions into builtins that automatically lift/collapse into dice expressions.
@@ -85,8 +82,8 @@ liftValue2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> f a b
 
 liftRealCmp :: Builtin -> (Double -> Double -> Bool) -> Value
 liftRealCmp ident f = VBuiltin $ \a -> return $ VBuiltin $ \b -> do
-  a' <- assertRealE ident a
-  b' <- assertRealE ident b
+  a' <- assertReal ident a
+  b' <- assertReal ident b
   return $ VBool (f a' b')
 
 ---
@@ -102,7 +99,7 @@ equality (VBuiltin _) (VBuiltin _) = throwError $ BadComparisonType "function"
 equality (VList a) (VList b)
   | length a /= length b = return $ VBool False
   | otherwise = do
-      eqs <- zipWithM equality a b >>= mapM assertBoolE
+      eqs <- zipWithM equality a b >>= mapM assertBool
       return $ VBool (and eqs)
 equality (VDice _) (VDice _) = throwError $ BadComparisonType "dice"
 equality (VPool _ _) (VPool _ _) = throwError $ BadComparisonType "pool"
@@ -120,7 +117,7 @@ getExactInteger x
 
 onePosIntParam :: Builtin -> (Int -> Gen Value) -> Value
 onePosIntParam b f = VBuiltin $ \n -> do
-  n' <- assertRealE b n
+  n' <- assertReal b n
   case getExactInteger n' of
     Just i ->
       if i <= 0
@@ -130,7 +127,7 @@ onePosIntParam b f = VBuiltin $ \n -> do
 
 oneDoubleParam :: Builtin -> (Double -> Gen Value) -> Value
 oneDoubleParam b f = VBuiltin $ \n -> do
-  n' <- assertRealE b n
+  n' <- assertReal b n
   (return . VDice . liftGen . f) n'
 
 ---
@@ -153,16 +150,16 @@ fetchBuiltin _ Add = liftNumber2 (+)
 fetchBuiltin _ Sub = liftNumber2 (-)
 fetchBuiltin _ Mul = liftNumber2 (*)
 fetchBuiltin _ Div = liftValue2 $ \d d' -> do
-  n <- assertNumberE d
-  n' <- assertNumberE d'
+  n <- assertNumber d
+  n' <- assertNumber d'
   if n =~= 0
     then
       throwError DivisionByZero
     else
       return $ VNumber (n / n')
 fetchBuiltin _ Mod = liftValue2 $ \d d' -> do
-  n <- assertNumberE d
-  n' <- assertNumberE d'
+  n <- assertNumber d
+  n' <- assertNumber d'
   if n' =~= 0
     then
       throwError DivisionByZero
@@ -175,7 +172,7 @@ fetchBuiltin _ Floor = liftNumber wnFloor
 fetchBuiltin _ Ceil = liftNumber wnCeil
 fetchBuiltin _ Eq = liftValue2 equality
 fetchBuiltin _ Neq =
-  liftValue2 $ \a b -> VBool . not <$> (equality a b >>= assertBoolE)
+  liftValue2 $ \a b -> VBool . not <$> (equality a b >>= assertBool)
 fetchBuiltin _ Le = liftRealCmp Le (<=)
 fetchBuiltin _ Lt = liftRealCmp Lt (<)
 fetchBuiltin _ Ge = liftRealCmp Ge (>=)
@@ -201,19 +198,19 @@ fetchBuiltin apt Ap = VBuiltin $ \mf -> return $ VBuiltin $ \ma -> do
   t <- fetchOutputType2 apt
   case t of
     (TApp TList _) -> do
-      lf <- assertListE mf
-      la <- assertListE mf
+      lf <- assertList mf
+      la <- assertList mf
       VList <$> sequence (map applyValue lf <*> la)
     (TApp TDice _) -> do
-      df <- assertDiceE mf
-      da <- assertDiceE ma
+      df <- assertDice mf
+      da <- assertDice ma
       return $ VDice $ do
         vf <- df
         va <- da
         applyValueRoll env vf va
     (TApp TPool _) -> do
-      (poolf, sourcef) <- assertPoolE mf
-      (poola, sourcea) <- assertPoolE ma
+      (poolf, sourcef) <- assertPool mf
+      (poola, sourcea) <- assertPool ma
       return $
         VPool
           ( do
@@ -240,7 +237,7 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
   case m of
     VList l -> do
       vs <- mapM (applyValue f) l
-      VList . concat <$> mapM assertListE vs
+      VList . concat <$> mapM assertList vs
     VDice d -> return $ VDice $ do
       v <- d
       bound <- applyValueRoll env f v
@@ -276,25 +273,25 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
 -- TODO: dice need criticality
 fetchBuiltin _ DiceD = onePosIntParam DiceD $ \i -> VNumber . literal . fromIntegral <$> chooseInt (1, i)
 fetchBuiltin _ DiceS = VBuiltin $ \n -> do
-  n' <- assertListE n
+  n' <- assertList n
   case n' of
     [] -> throwError $ BadDieParameter DiceS "expected a non-empty list" n
     _ -> (return . VDice . liftGen . elements) n'
 fetchBuiltin _ DiceF = onePosIntParam DiceF $ \i -> VNumber . literal . fromIntegral <$> chooseInt (-i, i)
-fetchBuiltin _ DiceU = oneDoubleParam DiceU $ \i -> VNumber . literal <$> choose (0.0, i)
+fetchBuiltin _ DiceU = oneDoubleParam DiceU $ \i -> VNumber . literal . D <$> choose (0.0, i)
 fetchBuiltin _ DiceGauss = oneDoubleParam DiceGauss $ \n ->
   VNumber . literal <$> do
     u1 <- choose (0.0, 1.0)
     u2 <- choose (0.0, 1.0)
     let z = sqrt (-(2.0 * log u1)) * cos (2.0 * pi * u2)
-    return $ n * z
+    return . D $ n * z
 fetchBuiltin _ DicePareto = oneDoubleParam DicePareto $ \n ->
   VNumber . literal <$> do
     u <- choose (0.0, 1.0)
-    return $ u ** (1.0 / n)
+    return . D $ u ** (1.0 / n)
 fetchBuiltin _ DiceBinomial = VBuiltin $ \n -> return $ VBuiltin $ \p -> do
-  n' <- assertRealE DiceBinomial n
-  p' <- assertRealE DiceBinomial p
+  n' <- assertReal DiceBinomial n
+  p' <- assertReal DiceBinomial p
 
   case getExactInteger n' of
     Nothing -> throwError $ BadDieParameter DiceBinomial "expected an integer number of trials" n
@@ -310,7 +307,7 @@ fetchBuiltin _ DiceBinomial = VBuiltin $ \n -> return $ VBuiltin $ \p -> do
 fetchBuiltin _ DiceCoin = VDice $ liftGen $ elements [VBool True, VBool False]
 fetchBuiltin _ DiceCircle = oneDoubleParam DiceCircle $ \r -> do
   theta <- choose (0.0, 2.0 * pi)
-  return . VNumber $ complexLiteral (r * cos theta) (r * sin theta)
+  return . VNumber $ literal . CD $ (r * cos theta) :+ (r * sin theta)
 fetchBuiltin _ Constant = VBuiltin $ return . VDice . liftGen . return
 fetchBuiltin _ Collapse = VBuiltin collapse
   where
@@ -327,7 +324,7 @@ fetchBuiltin _ Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
   where
     poolify :: Value -> Value -> Eval Value
     poolify v@(VNumber _) (VDice d) = do
-      n' <- assertRealE Poolify v -- TODO: this is stupid. we know v is a number, but this checks that again
+      n' <- assertReal Poolify v -- TODO: this is stupid. we know v is a number, but this checks that again
       case getExactInteger n' of
         Nothing -> throwError $ BadDieParameter Poolify "expected an integer number of dice" v
         Just count ->
@@ -337,5 +334,5 @@ fetchBuiltin _ Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
     poolify (VNumber _) e = throwError $ TypeError (mkDice TNumber) e
     poolify n _ = throwError $ TypeError TNumber n
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
-  xs' <- assertListE xs
-  VNumber . sum <$> mapM assertNumberE xs'
+  xs' <- assertList xs
+  VNumber . sum <$> mapM assertNumber xs'

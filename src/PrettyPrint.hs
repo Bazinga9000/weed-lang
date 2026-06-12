@@ -4,6 +4,7 @@ import AST
 import Control.Monad.Writer.CPS
 import qualified Data.Text as T
 import Evaluator.Types
+import Evaluator.WeedNumber (formatWeedNumber)
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
 
@@ -116,7 +117,7 @@ instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTMapPool t f pool) = "(map " <> prettyPrint f <> " " <> prettyPrint pool <> "::" <> prettyPrint t <> ")"
 
 instance PrettyPrintable Value where
-  prettyPrint (VNumber n) = show n
+  prettyPrint (VNumber n) = formatWeedNumber n
   prettyPrint (VBool b) = show b
   prettyPrint VUnit = "()"
   prettyPrint (VList xs) = prettyPrint xs

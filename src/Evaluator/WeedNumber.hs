@@ -3,35 +3,25 @@ module Evaluator.WeedNumber where
 import Data.Complex
 import Evaluator.Metadata
 import Numeric (Floating (log))
+import TowerNumber.Core
+import TowerNumber.Parse (formatTN)
 
 data WeedNumber = WeedNumber
-  { value :: Complex Double,
+  { value :: TowerNumber,
     metadata :: Maybe NumberMetadata
   }
-  deriving (Show)
 
-literal :: Double -> WeedNumber
-literal x = WeedNumber {value = x :+ 0, metadata = Nothing}
+formatWeedNumber :: WeedNumber -> Text
+formatWeedNumber = formatTN . value -- ignores metadata, but right now metadata isn't actually produced
 
-complexLiteral :: Double -> Double -> WeedNumber
-complexLiteral x y = WeedNumber {value = x :+ y, metadata = Nothing}
+literal :: TowerNumber -> WeedNumber
+literal x = WeedNumber {value = x, metadata = Nothing}
 
-lift1WN :: (Complex Double -> Complex Double) -> WeedNumber -> WeedNumber
+lift1WN :: (TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber
 lift1WN f x = WeedNumber {value = f (value x), metadata = metadata x}
 
-lift2WN :: (Complex Double -> Complex Double -> Complex Double) -> WeedNumber -> WeedNumber -> WeedNumber
+lift2WN :: (TowerNumber -> TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber -> WeedNumber
 lift2WN f x y = WeedNumber {value = f (value x) (value y), metadata = metadata x <> metadata y}
-
-complexFloor :: Complex Double -> Complex Double
-complexFloor (r :+ i)
-  | 1.0 > x + y = b
-  | x >= y = b + (1.0 :+ 0)
-  | otherwise = b + (0 :+ 1.0)
-  where
-    fl = fromInteger . floor
-    b = fl r :+ fl i
-    x = r - fl r
-    y = i - fl i
 
 instance Num WeedNumber where
   (+) = lift2WN (+)
@@ -65,19 +55,19 @@ instance Floating WeedNumber where
   atanh = lift1WN atanh
 
 wnFloor :: WeedNumber -> WeedNumber
-wnFloor = lift1WN complexFloor
+wnFloor = lift1WN tnFloor
 
 wnCeil :: WeedNumber -> WeedNumber
-wnCeil = lift1WN $ negate . complexFloor . negate
+wnCeil = lift1WN tnCeil
 
 wnMod :: WeedNumber -> WeedNumber -> WeedNumber
-wnMod = lift2WN $ \a b -> a - b * complexFloor (a / b)
+wnMod = lift2WN tnMod
 
 wnCAdd :: WeedNumber -> WeedNumber -> WeedNumber
-wnCAdd = lift2WN $ \a b -> a + b * (0 :+ 1)
+wnCAdd = lift2WN $ \a b -> a + b * CR (0 :+ 1)
 
 wnCSub :: WeedNumber -> WeedNumber -> WeedNumber
-wnCSub = lift2WN $ \a b -> a + b * (0 :+ (-1))
+wnCSub = lift2WN $ \a b -> a + b * CR (0 :+ (-1))
 
 infix 4 =~=
 
