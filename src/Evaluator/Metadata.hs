@@ -44,3 +44,12 @@ instance Semigroup NumberMetadata where
         failLevel = failLevel a <> failLevel b,
         extraDice = extraDice a <> extraDice b
       }
+
+instance Monoid NumberMetadata where
+  mempty =
+    NumberMetadata
+      { dropped = False,
+        critLevel = mempty,
+        failLevel = mempty,
+        extraDice = mempty
+      }
