@@ -19,7 +19,7 @@
         { self', pkgs, ... }:
         {
           haskellProjects.default = {
-            basePackages = pkgs.haskell.packages.ghc98;
+            basePackages = pkgs.haskell.packages.ghc910;
 
             packages = {
             };
