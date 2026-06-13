@@ -1,5 +1,7 @@
 module Evaluator.Metadata where
 
+import Control.Lens
+
 -- Used to keep track of boolean values across dice operations.
 -- The first component is the number of dice that had the property, the second is the number that did not
 newtype Multibool = Multibool (Nat, Nat) deriving (Eq, Show)
@@ -28,28 +30,39 @@ getMark (Multibool (1, 0)) = OneMark
 getMark (Multibool (_, 0)) = TwoMarks
 getMark _ = OneMark
 
+hasMark :: Multibool -> Bool
+hasMark = (/= NoMark) . getMark
+
+mkMark :: (Monoid a) => (a, a) -> Multibool -> a
+mkMark (om, tm) mb = case getMark mb of
+  NoMark -> mempty
+  OneMark -> om
+  TwoMarks -> tm
+
 data NumberMetadata = NumberMetadata
-  { dropped :: Bool,
-    critLevel :: Multibool,
-    failLevel :: Multibool,
-    extraDice :: Multibool
+  { _dropped :: Bool,
+    _critLevel :: Multibool,
+    _failLevel :: Multibool,
+    _extraDice :: Multibool
   }
   deriving (Eq, Show)
+
+makeLenses ''NumberMetadata
 
 instance Semigroup NumberMetadata where
   a <> b =
     NumberMetadata
-      { dropped = dropped a || dropped b,
-        critLevel = critLevel a <> critLevel b,
-        failLevel = failLevel a <> failLevel b,
-        extraDice = extraDice a <> extraDice b
+      { _dropped = _dropped a || _dropped b,
+        _critLevel = _critLevel a <> _critLevel b,
+        _failLevel = _failLevel a <> _failLevel b,
+        _extraDice = _extraDice a <> _extraDice b
       }
 
 instance Monoid NumberMetadata where
   mempty =
     NumberMetadata
-      { dropped = False,
-        critLevel = mempty,
-        failLevel = mempty,
-        extraDice = mempty
+      { _dropped = False,
+        _critLevel = mempty,
+        _failLevel = mempty,
+        _extraDice = mempty
       }

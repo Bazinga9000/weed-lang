@@ -17,10 +17,12 @@ common shared-config
       ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -Wmissing-home-modules -Widentities -Werror
     default-extensions:
         OverloadedStrings
+        TemplateHaskell
     build-depends:
         base >= 4.14 && < 5,
         relude,
-        text
+        text,
+        lens
     mixins:
         base hiding (Prelude),
 
@@ -50,6 +52,7 @@ library
                     , Evaluator.WeedNumber
                     , Evaluator.Metadata
                     , Formatting.ANSI
+                    , Formatting.Metadata
                     , TowerNumber.Core
                     , TowerNumber.Utils
                     , TowerNumber.Parse
