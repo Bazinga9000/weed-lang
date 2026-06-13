@@ -37,7 +37,6 @@ library
                     , QuickCheck
     exposed-modules:  Prelude
                     , AST
-                    , PrettyPrint
                     , Parser.Lexer
                     , Parser.SurfaceParser
                     , Parser.Lowerer
@@ -53,6 +52,7 @@ library
                     , Evaluator.Metadata
                     , Formatting.ANSI
                     , Formatting.Metadata
+                    , Formatting.Pretty
                     , TowerNumber.Core
                     , TowerNumber.Utils
                     , TowerNumber.Parse

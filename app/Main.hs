@@ -5,7 +5,7 @@ import Formatting.ANSI
 import Parser.Lexer
 import Parser.Lowerer
 import Parser.SurfaceParser
-import PrettyPrint
+import Formatting.Pretty (prettyPrint)
 import System.Console.Haskeline
 import TypeChecker
 

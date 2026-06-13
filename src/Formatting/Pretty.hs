@@ -1,4 +1,4 @@
-module PrettyPrint where
+module Formatting.Pretty where
 
 import AST
 import Control.Monad.Writer.CPS
@@ -8,21 +8,21 @@ import Evaluator.WeedNumber (formatWeedNumber)
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
 
-class PrettyPrintable a where
+class Pretty a where
   prettyPrint :: a -> Text
 
-instance PrettyPrintable WeedTypeClass where
+instance Pretty WeedTypeClass where
   prettyPrint CFunctor = "Functor"
   prettyPrint CMonad = "Monad"
   prettyPrint CRollable = "Rollable"
 
-instance PrettyPrintable TypeConstraint where
+instance Pretty TypeConstraint where
   prettyPrint (CInstanceOf cls tv) = prettyPrint cls <> " " <> prettyPrint tv
 
-instance PrettyPrintable TypeVarName where
+instance Pretty TypeVarName where
   prettyPrint (TypeVarName n) = "t" <> show n
 
-instance PrettyPrintable WeedType where
+instance Pretty WeedType where
   prettyPrint TNumber = "ℕ"
   prettyPrint TBool = "𝔹"
   prettyPrint TUnit = "()"
@@ -36,7 +36,7 @@ instance PrettyPrintable WeedType where
   prettyPrint (TVar n) = prettyPrint n
   prettyPrint (TApp t1 t2) = "(" <> prettyPrint t1 <> " " <> prettyPrint t2 <> ")"
 
-instance PrettyPrintable Builtin where
+instance Pretty Builtin where
   prettyPrint Negate = "negate"
   prettyPrint Not = "not"
   prettyPrint Add = "(+)"
@@ -78,20 +78,20 @@ instance PrettyPrintable Builtin where
   prettyPrint Poolify = "(#)"
   prettyPrint Sum = "sum"
 
-instance PrettyPrintable IdentifierName where
+instance Pretty IdentifierName where
   prettyPrint (S s) = show s
   prettyPrint (U i) = "g#" <> show i
   prettyPrint (B b) = prettyPrint b
 
-instance (PrettyPrintable a) => PrettyPrintable [a] where
+instance (Pretty a) => Pretty [a] where
   prettyPrint xs = "[" <> T.intercalate ", " (map prettyPrint xs) <> "]"
 
-instance (PrettyPrintable a) => PrettyPrintable (Declaration a) where
+instance (Pretty a) => Pretty (Declaration a) where
   prettyPrint (Decl name body) = prettyPrint name <> " = " <> prettyPrint body
 
 -- todo surface expr
 
-instance PrettyPrintable CoreUntypedExpr where
+instance Pretty CoreUntypedExpr where
   prettyPrint (CUNumber n) = show n
   prettyPrint (CUBool b) = show b
   prettyPrint CUUnit = "()"
@@ -103,7 +103,7 @@ instance PrettyPrintable CoreUntypedExpr where
   prettyPrint (CUIf e1 e2 e3) = "if " <> prettyPrint e1 <> " then " <> prettyPrint e2 <> " else " <> prettyPrint e3
   prettyPrint (CULetRec decls e2) = "let " <> prettyPrint decls <> " in " <> prettyPrint e2
 
-instance PrettyPrintable CoreTypedExpr where
+instance Pretty CoreTypedExpr where
   prettyPrint (CTNumber n) = show n
   prettyPrint (CTBool b) = show b
   prettyPrint CTUnit = "()"
@@ -116,7 +116,7 @@ instance PrettyPrintable CoreTypedExpr where
   prettyPrint (CTIf t cond tb fb) = "(if " <> prettyPrint cond <> " then " <> prettyPrint tb <> " else " <> prettyPrint fb <> "::" <> prettyPrint t <> ")"
   prettyPrint (CTMapPool t f pool) = "(map " <> prettyPrint f <> " " <> prettyPrint pool <> "::" <> prettyPrint t <> ")"
 
-instance PrettyPrintable Value where
+instance Pretty Value where
   prettyPrint (VNumber n) = formatWeedNumber n
   prettyPrint (VBool b) = show b
   prettyPrint VUnit = "()"
@@ -126,7 +126,7 @@ instance PrettyPrintable Value where
   prettyPrint (VPool _ _) = "<A Pool>"
   prettyPrint (VDice _) = "<A Dice>"
 
-instance PrettyPrintable EvaluationError where
+instance Pretty EvaluationError where
   prettyPrint DivisionByZero = "Division by zero"
   prettyPrint (BadComparisonType t) = "Bad comparison type: " <> show t
   prettyPrint (DomainError b) = "Domain error: Builtin " <> prettyPrint b <> " expected real, got complex"
@@ -135,7 +135,7 @@ instance PrettyPrintable EvaluationError where
   prettyPrint InfiniteRecursiveBinding = "Mutually recursive let block contained strictly evaluated bindings (would <<loop>>)"
   prettyPrint (InterpreterBug s) = "Interpreter bug: " <> s
 
-instance (PrettyPrintable l, PrettyPrintable r) => PrettyPrintable (Either l r) where
+instance (Pretty l, Pretty r) => Pretty (Either l r) where
   prettyPrint (Left l) = prettyPrint l
   prettyPrint (Right r) = prettyPrint r
 

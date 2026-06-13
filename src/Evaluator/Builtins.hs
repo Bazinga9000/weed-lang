@@ -9,7 +9,7 @@ import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Numeric (Floating (log))
-import PrettyPrint
+import Formatting.Pretty (prettyPrint)
 import Test.QuickCheck.Gen
 import TowerNumber.Core
 import TypeChecker.Types

@@ -4,7 +4,7 @@ import AST
 import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
-import PrettyPrint
+import Formatting.Pretty (prettyPrint)
 import Test.Tasty
 import Test.Tasty.HUnit
 import TypeChecker.Types
