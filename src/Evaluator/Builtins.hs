@@ -4,43 +4,14 @@ import AST
 -- TODO: this is a cyclic dependency, but only because of the monads needing access to `eval`, `applyValue`, `applyValueRoll`import Evaluator
 -- figure out a way to clean this up later
 import Control.Monad.Except
-import Data.Complex
 import Evaluator
+import Evaluator.Assertions
+import Evaluator.DicePrimitives qualified as D
 import Evaluator.Types
 import Evaluator.WeedNumber
-import Numeric (Floating (log))
 import Formatting.Pretty (prettyPrint)
-import Test.QuickCheck.Gen
-import TowerNumber.Core
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
-
-assertNumber :: (MonadError EvaluationError m) => Value -> m WeedNumber
-assertNumber (VNumber n) = return n
-assertNumber e = throwError $ TypeError TNumber e
-
-assertReal :: (MonadError EvaluationError m) => Builtin -> Value -> m Double
-assertReal builtin (VNumber wn) = do
-  case tnIntoDouble (value wn) of
-    Just r -> return r
-    Nothing -> throwError $ DomainError builtin
-assertReal _ e = throwError $ TypeError TNumber e
-
-assertBool :: (MonadError EvaluationError m) => Value -> m Bool
-assertBool (VBool b) = return b
-assertBool e = throwError $ TypeError TBool e
-
-assertList :: (MonadError EvaluationError m) => Value -> m [Value]
-assertList (VList xs) = return xs
-assertList e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
-
-assertDice :: (MonadError EvaluationError m) => Value -> m (Roll Value)
-assertDice (VDice r) = return r
-assertDice e = throwError $ TypeError TDice e
-
-assertPool :: (MonadError EvaluationError m) => Value -> m (Roll [Value], Roll Value)
-assertPool (VPool r s) = return (r, s)
-assertPool e = throwError $ TypeError TPool e
 
 --
 -- Helper functions to lift functions into builtins that automatically lift/collapse into dice expressions.
@@ -112,25 +83,6 @@ getExactInteger x
   | otherwise = Nothing
 
 ---
--- Dice Helpers
----
-
-onePosIntParam :: Builtin -> (Int -> Gen Value) -> Value
-onePosIntParam b f = VBuiltin $ \n -> do
-  n' <- assertReal b n
-  case getExactInteger n' of
-    Just i ->
-      if i <= 0
-        then throwError $ BadDieParameter b "expected a positive integer" n
-        else (return . VDice . liftGen . f) i
-    Nothing -> throwError $ BadDieParameter b "expected an integer" n
-
-oneDoubleParam :: Builtin -> (Double -> Gen Value) -> Value
-oneDoubleParam b f = VBuiltin $ \n -> do
-  n' <- assertReal b n
-  (return . VDice . liftGen . f) n'
-
----
 --- Monad Helpers
 ---
 
@@ -149,22 +101,8 @@ fetchBuiltin _ Not = liftBool not
 fetchBuiltin _ Add = liftNumber2 (+)
 fetchBuiltin _ Sub = liftNumber2 (-)
 fetchBuiltin _ Mul = liftNumber2 (*)
-fetchBuiltin _ Div = liftValue2 $ \d d' -> do
-  n <- assertNumber d
-  n' <- assertNumber d'
-  if n =~= 0
-    then
-      throwError DivisionByZero
-    else
-      return $ VNumber (n / n')
-fetchBuiltin _ Mod = liftValue2 $ \d d' -> do
-  n <- assertNumber d
-  n' <- assertNumber d'
-  if n' =~= 0
-    then
-      throwError DivisionByZero
-    else
-      return $ VNumber (n `wnMod` n')
+fetchBuiltin _ Div = liftNumber2 (/)
+fetchBuiltin _ Mod = liftNumber2 wnMod
 fetchBuiltin _ Pow = liftNumber2 (**)
 fetchBuiltin _ ComplexAdd = liftNumber2 wnCAdd
 fetchBuiltin _ ComplexSub = liftNumber2 wnCSub
@@ -269,45 +207,15 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
 
       return $ VPool boundPool boundSource
     _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> prettyPrint m <> ">>=" <> prettyPrint f <> ")"
-
--- TODO: dice need criticality
-fetchBuiltin _ DiceD = onePosIntParam DiceD $ \i -> VNumber . literal . fromIntegral <$> chooseInt (1, i)
-fetchBuiltin _ DiceS = VBuiltin $ \n -> do
-  n' <- assertList n
-  case n' of
-    [] -> throwError $ BadDieParameter DiceS "expected a non-empty list" n
-    _ -> (return . VDice . liftGen . elements) n'
-fetchBuiltin _ DiceF = onePosIntParam DiceF $ \i -> VNumber . literal . fromIntegral <$> chooseInt (-i, i)
-fetchBuiltin _ DiceU = oneDoubleParam DiceU $ \i -> VNumber . literal . D <$> choose (0.0, i)
-fetchBuiltin _ DiceGauss = oneDoubleParam DiceGauss $ \n ->
-  VNumber . literal <$> do
-    u1 <- choose (0.0, 1.0)
-    u2 <- choose (0.0, 1.0)
-    let z = sqrt (-(2.0 * log u1)) * cos (2.0 * pi * u2)
-    return . D $ n * z
-fetchBuiltin _ DicePareto = oneDoubleParam DicePareto $ \n ->
-  VNumber . literal <$> do
-    u <- choose (0.0, 1.0)
-    return . D $ u ** (1.0 / n)
-fetchBuiltin _ DiceBinomial = VBuiltin $ \n -> return $ VBuiltin $ \p -> do
-  n' <- assertReal DiceBinomial n
-  p' <- assertReal DiceBinomial p
-
-  case getExactInteger n' of
-    Nothing -> throwError $ BadDieParameter DiceBinomial "expected an integer number of trials" n
-    Just trials ->
-      if p' < 0.0 || p' > 1.0
-        then throwError $ BadDieParameter DiceBinomial "expected a probability between 0 and 1" p
-        else do
-          let oneTrial = (\r -> if r < p' then 1 else 0) <$> choose (0.0, 1.0)
-          return . VDice . liftGen $ VNumber . intliteral . sum <$> replicateM trials oneTrial
-      where
-        intliteral :: Int -> WeedNumber
-        intliteral = literal . fromIntegral
-fetchBuiltin _ DiceCoin = VDice $ liftGen $ elements [VBool True, VBool False]
-fetchBuiltin _ DiceCircle = oneDoubleParam DiceCircle $ \r -> do
-  theta <- choose (0.0, 2.0 * pi)
-  return . VNumber $ literal . CD $ (r * cos theta) :+ (r * sin theta)
+fetchBuiltin _ DiceD = D.d
+fetchBuiltin _ DiceS = D.s
+fetchBuiltin _ DiceF = D.f
+fetchBuiltin _ DiceU = D.u
+fetchBuiltin _ DiceGauss = D.gauss
+fetchBuiltin _ DicePareto = D.pareto
+fetchBuiltin _ DiceBinomial = D.binomial
+fetchBuiltin _ DiceCoin = D.coin
+fetchBuiltin _ DiceCircle = D.circle
 fetchBuiltin _ Constant = VBuiltin $ return . VDice . liftGen . return
 fetchBuiltin _ Collapse = VBuiltin collapse
   where

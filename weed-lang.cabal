@@ -47,7 +47,9 @@ library
                     , TypeChecker.Infer
                     , Evaluator
                     , Evaluator.Types
+                    , Evaluator.Assertions
                     , Evaluator.Builtins
+                    , Evaluator.DicePrimitives
                     , Evaluator.WeedNumber
                     , Evaluator.Metadata
                     , Formatting.ANSI

@@ -22,6 +22,7 @@ data ANSIForegroundColor
   | Pink
   | Cyan
   | White
+  deriving (Show, Eq, Ord)
 
 ansiFCValue :: ANSIForegroundColor -> Int
 ansiFCValue Gray = 30
@@ -34,7 +35,7 @@ ansiFCValue Cyan = 36
 ansiFCValue White = 37
 
 -- todo: maybe make this less jank
-data ANSIWeight = Normal | Bold | Underline | BoldUnderline
+data ANSIWeight = Normal | Bold | Underline | BoldUnderline deriving (Show, Eq, Ord)
 
 ansiWCode :: ANSIWeight -> Text
 ansiWCode Normal = "0"

@@ -10,6 +10,7 @@ data WeedNumber = WeedNumber
   { _value :: TowerNumber,
     _metadata :: Maybe NumberMetadata
   }
+  deriving (Show)
 
 makeLenses ''WeedNumber
 
@@ -17,7 +18,7 @@ literal :: TowerNumber -> WeedNumber
 literal x = WeedNumber {_value = x, _metadata = Nothing}
 
 blank :: TowerNumber -> WeedNumber
-blank x = WeedNumber {_value = x, _metadata = Nothing}
+blank x = WeedNumber {_value = x, _metadata = Just mempty}
 
 lift1WN :: (TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber
 lift1WN f x = x & value %~ f

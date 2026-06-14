@@ -1,6 +1,7 @@
 module Formatting.Pretty where
 
 import AST
+import Control.Lens hiding (Identity)
 import Control.Monad.Writer.CPS
 import Data.Text qualified as T
 import Evaluator.Types
@@ -123,11 +124,11 @@ instance Pretty TowerNumber where
   prettyPrint = formatTN
 
 instance Pretty WeedNumber where
-  prettyPrint wn = case metadata wn of
+  prettyPrint wn = case wn ^. metadata of
     Nothing -> tnText
     Just md -> formatWithMetadata md tnText
     where
-      tnText = prettyPrint $ value wn
+      tnText = prettyPrint $ wn ^. value
 
 instance Pretty Value where
   prettyPrint (VNumber n) = prettyPrint n
