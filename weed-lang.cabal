@@ -22,7 +22,8 @@ common shared-config
         base >= 4.14 && < 5,
         relude,
         text,
-        lens
+        lens,
+        QuickCheck
     mixins:
         base hiding (Prelude),
 
@@ -34,7 +35,6 @@ library
     build-depends:    array
                     , mtl
                     , containers
-                    , QuickCheck
     exposed-modules:  Prelude
                     , AST
                     , Parser.Lexer
@@ -74,6 +74,7 @@ test-suite test-weed
     build-depends:    weed-lang
                     , tasty
                     , tasty-hunit
+                    , tasty-quickcheck
                     , containers
     other-modules:    Tests.Lexer
                     , Tests.SurfaceParser
