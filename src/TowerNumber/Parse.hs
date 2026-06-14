@@ -54,19 +54,23 @@ formatR r
   | otherwise = show (numerator r) <> "/" <> show (denominator r)
 
 formatCR :: Complex Rational -> Text
-formatCR (rx :+ ry) =
-  let denX = denominator rx
-      denY = denominator ry
-      c = lcm denX denY
+formatCR (rx :+ ry)
+  | rx == 0 && denominator ry == 1 = show (numerator ry) <> "i"
+  | rx == 0 && numerator ry == 1 = "i/" <> show (denominator ry)
+  | rx == 0 = show (numerator ry) <> "i/" <> show (denominator ry)
+  | otherwise =
+      let denX = denominator rx
+          denY = denominator ry
+          c = lcm denX denY
 
-      a = numerator rx * (c `div` denX)
-      b = numerator ry * (c `div` denY)
+          a = numerator rx * (c `div` denX)
+          b = numerator ry * (c `div` denY)
 
-      (sign, b') = if b < 0 then (" :- ", abs b) else (" :+ ", b)
-      numBlock = show a <> sign <> show b' <> "i"
-   in if c == 1
-        then numBlock
-        else numBlock <> "/" <> show c
+          (sign, b') = if b < 0 then (" - ", abs b) else (" + ", b)
+          numBlock = "(" <> show a <> sign <> show b' <> "i)"
+       in if c == 1
+            then numBlock
+            else numBlock <> "/" <> show c
 
 formatCD :: Complex Double -> Text
 formatCD (dx :+ dy)
