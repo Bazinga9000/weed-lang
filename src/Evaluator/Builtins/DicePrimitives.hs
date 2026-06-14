@@ -63,7 +63,7 @@ s = wrapOne (DiceS, "a non-empty list") assertNonEmptyList sCore
   where
     sCore nel = mkBlank <$> (elements . toList $ nel)
 
-    mkBlank (VNumber wn) = VNumber $ (metadata .~ Just mempty) wn
+    mkBlank (VNumber wn) = VNumber $ (metadata ?~ mempty) wn
     mkBlank v = v
 
 -- fudge die
@@ -129,7 +129,7 @@ binomial =
   wrapTwo
     (DiceBinomial, "a positive integer", "a probability between 0 and 1")
     assertPositive
-    ((assertRealPredicate $ \prob -> prob >= 0.0 && prob <= 1.0))
+    (assertRealPredicate $ \prob -> prob >= 0.0 && prob <= 1.0)
     binomialCore
   where
     binomialCore trials prob = do

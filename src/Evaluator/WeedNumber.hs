@@ -87,4 +87,4 @@ wnLiftMeta :: (NumberMetadata -> NumberMetadata) -> WeedNumber -> WeedNumber
 wnLiftMeta f n = n & metadata . _Just %~ f
 
 wnIsPure :: WeedNumber -> Bool
-wnIsPure n = has (metadata . _Nothing) n
+wnIsPure = has (metadata . _Nothing)

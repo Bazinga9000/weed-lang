@@ -1,8 +1,8 @@
 module TypeChecker.Subst where
 
 import AST
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import TypeChecker.Types
 
 type Subst = Map.Map TypeVarName WeedType

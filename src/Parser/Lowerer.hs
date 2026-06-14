@@ -3,8 +3,8 @@ module Parser.Lowerer where
 import AST
 import Control.Monad.RWS.CPS
 import Data.Graph (SCC (..), stronglyConnComp)
-import qualified Data.List as L
-import qualified Data.Sequence as S
+import Data.List (lookup)
+import Data.Sequence qualified as S
 import Prelude hiding (Ap, Identity, Sum)
 
 data LoweringError
@@ -236,7 +236,7 @@ resolveBuiltins expr = return $ runReader (resolveBuiltins' expr) []
       if s `elem` ctx
         then
           return (SIdentifier (S s))
-        else case L.lookup s builtinEnv of
+        else case lookup s builtinEnv of
           Just b -> return (SIdentifier (B b))
           Nothing -> return (SIdentifier (S s))
     resolveBuiltins' (SUnaryOp s e) = SUnaryOp s <$> resolveBuiltins' e

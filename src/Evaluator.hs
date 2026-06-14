@@ -5,7 +5,7 @@ import AST
 
 import Control.Monad.Except (throwError)
 -- import Control.Monad.Fix
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import {-# SOURCE #-} Evaluator.Builtins
 import Evaluator.Types
 import Evaluator.WeedNumber

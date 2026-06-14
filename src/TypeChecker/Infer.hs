@@ -3,9 +3,9 @@ module TypeChecker.Infer where
 import AST
 import Control.Monad.Except (Except, throwError)
 import Control.Monad.RWS.CPS (RWST, tell)
-import qualified Data.List as List
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import Data.List (partition)
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import TypeChecker.Subst
 import TypeChecker.Types
 
@@ -133,7 +133,7 @@ generalize t localConstraints = do
   -- partition the constraints
   -- constraints that exclusively mention quantified variables go into the scheme
   -- constraints that mention free variables go into the environment
-  let (scooped, deferred) = List.partition canScoop localConstraints
+  let (scooped, deferred) = partition canScoop localConstraints
   tell deferred
   return $ ForAll genVars scooped t'
 
