@@ -7,9 +7,9 @@ import Formatting.ANSI
 colorMetadata :: NumberMetadata -> Maybe ANSIForegroundColor
 colorMetadata m
   | m ^. dropped = Just Gray
-  | hasMark (m ^. critLevel) && hasMark (m ^. failLevel) = Just Yellow
-  | hasMark (m ^. critLevel) = Just Green
-  | hasMark (m ^. failLevel) = Just Red
+  | hasTwoMarks (m ^. critLevel) && hasMark (m ^. failLevel) = Just Yellow
+  | hasTwoMarks (m ^. critLevel) = Just Green
+  | hasTwoMarks (m ^. failLevel) = Just Red
   | hasMark (m ^. extraDice) = Just Blue
   | otherwise = Nothing
 

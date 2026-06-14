@@ -26,12 +26,14 @@ data MultiboolMark = NoMark | OneMark | TwoMarks deriving (Eq, Show, Ord, Enum, 
 
 getMark :: Multibool -> MultiboolMark
 getMark (Multibool (0, _)) = NoMark
-getMark (Multibool (1, 0)) = OneMark
 getMark (Multibool (_, 0)) = TwoMarks
 getMark _ = OneMark
 
 hasMark :: Multibool -> Bool
 hasMark = (/= NoMark) . getMark
+
+hasTwoMarks :: Multibool -> Bool
+hasTwoMarks = (== TwoMarks) . getMark
 
 mkMark :: (Monoid a) => (a, a) -> Multibool -> a
 mkMark (om, tm) mb = case getMark mb of
