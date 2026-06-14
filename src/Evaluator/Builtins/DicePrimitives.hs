@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 
-module Evaluator.DicePrimitives where
+module Evaluator.Builtins.DicePrimitives where
 
 import AST
 import Control.Lens hiding (elements)

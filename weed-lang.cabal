@@ -49,7 +49,7 @@ library
                     , Evaluator.Types
                     , Evaluator.Assertions
                     , Evaluator.Builtins
-                    , Evaluator.DicePrimitives
+                    , Evaluator.Builtins.DicePrimitives
                     , Evaluator.WeedNumber
                     , Evaluator.Metadata
                     , Formatting.ANSI

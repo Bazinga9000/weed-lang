@@ -6,7 +6,7 @@ import AST
 import Control.Monad.Except
 import Evaluator
 import Evaluator.Assertions
-import Evaluator.DicePrimitives qualified as D
+import Evaluator.Builtins.DicePrimitives qualified as D
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Formatting.Pretty (prettyPrint)
