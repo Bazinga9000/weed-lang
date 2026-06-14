@@ -33,7 +33,8 @@ parseTN str =
           _ -> error "Unreachable state in parseLiteral"
      in if isNeg then negate rat else rat
 
--- todo: maybe just define this as a PrettyPrintable instance? TBH I don't really like the current structure of PrettyPrint as a module
+-- leaving this as its own function in this module which gets used directly in Formatting.Pretty.Numbers
+-- just in case i want to pull this into its own package at some point
 formatTN :: TowerNumber -> Text
 formatTN = \case
   R r -> formatR r

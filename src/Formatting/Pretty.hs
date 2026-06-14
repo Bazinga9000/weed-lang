@@ -2,9 +2,12 @@ module Formatting.Pretty where
 
 import AST
 import Control.Monad.Writer.CPS
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Evaluator.Types
-import Evaluator.WeedNumber (formatWeedNumber)
+import Evaluator.WeedNumber (WeedNumber, metadata, value)
+import Formatting.Metadata
+import TowerNumber.Core (TowerNumber)
+import TowerNumber.Parse (formatTN)
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
 
@@ -116,8 +119,18 @@ instance Pretty CoreTypedExpr where
   prettyPrint (CTIf t cond tb fb) = "(if " <> prettyPrint cond <> " then " <> prettyPrint tb <> " else " <> prettyPrint fb <> "::" <> prettyPrint t <> ")"
   prettyPrint (CTMapPool t f pool) = "(map " <> prettyPrint f <> " " <> prettyPrint pool <> "::" <> prettyPrint t <> ")"
 
+instance Pretty TowerNumber where
+  prettyPrint = formatTN
+
+instance Pretty WeedNumber where
+  prettyPrint wn = case metadata wn of
+    Nothing -> tnText
+    Just md -> formatWithMetadata md tnText
+    where
+      tnText = prettyPrint $ value wn
+
 instance Pretty Value where
-  prettyPrint (VNumber n) = formatWeedNumber n
+  prettyPrint (VNumber n) = prettyPrint n
   prettyPrint (VBool b) = show b
   prettyPrint VUnit = "()"
   prettyPrint (VList xs) = prettyPrint xs

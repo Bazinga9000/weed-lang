@@ -1,27 +1,33 @@
 module Evaluator.WeedNumber where
 
+import Control.Lens
 import Data.Complex
 import Evaluator.Metadata
 import Numeric (Floating (log))
 import TowerNumber.Core
-import TowerNumber.Parse (formatTN)
 
 data WeedNumber = WeedNumber
-  { value :: TowerNumber,
-    metadata :: Maybe NumberMetadata
+  { _value :: TowerNumber,
+    _metadata :: Maybe NumberMetadata
   }
 
-formatWeedNumber :: WeedNumber -> Text
-formatWeedNumber = formatTN . value -- ignores metadata, but right now metadata isn't actually produced
+makeLenses ''WeedNumber
 
 literal :: TowerNumber -> WeedNumber
-literal x = WeedNumber {value = x, metadata = Nothing}
+literal x = WeedNumber {_value = x, _metadata = Nothing}
+
+blank :: TowerNumber -> WeedNumber
+blank x = WeedNumber {_value = x, _metadata = Nothing}
 
 lift1WN :: (TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber
-lift1WN f x = WeedNumber {value = f (value x), metadata = metadata x}
+lift1WN f x = x & value %~ f
 
 lift2WN :: (TowerNumber -> TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber -> WeedNumber
-lift2WN f x y = WeedNumber {value = f (value x) (value y), metadata = metadata x <> metadata y}
+lift2WN f x y =
+  WeedNumber
+    { _value = f (x ^. value) (y ^. value),
+      _metadata = (x ^. metadata) <> (y ^. metadata)
+    }
 
 instance Num WeedNumber where
   (+) = lift2WN (+)
@@ -72,12 +78,12 @@ wnCSub = lift2WN $ \a b -> a + b * CR (0 :+ (-1))
 infix 4 =~=
 
 (=~=) :: WeedNumber -> WeedNumber -> Bool
-(=~=) a b = value a == value b
+(=~=) a b = a ^. value == b ^. value
 
 --- metadata related functions
 
 wnLiftMeta :: (NumberMetadata -> NumberMetadata) -> WeedNumber -> WeedNumber
-wnLiftMeta f n = n {metadata = f <$> metadata n}
+wnLiftMeta f n = n & metadata . _Just %~ f
 
 wnIsPure :: WeedNumber -> Bool
-wnIsPure = isNothing . metadata
+wnIsPure n = has (metadata . _Nothing) n

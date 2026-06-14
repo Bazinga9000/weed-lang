@@ -78,3 +78,4 @@ test-suite test-weed
                     , Tests.Lowerer
                     , Tests.TypeChecker
                     , Tests.Evaluator
+                    , Tests.TowerNumber
