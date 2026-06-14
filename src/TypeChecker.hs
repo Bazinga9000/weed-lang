@@ -51,7 +51,7 @@ infer (CUList (x : xs)) = do
   where
     appendCList :: CoreTypedExpr -> CoreTypedExpr -> Infer [CoreTypedExpr]
     appendCList cx (CTList _ cxs) = return (cx : cxs)
-    appendCList _ e = throwError $ "TC Bug: Expected a list, got " <> show e
+    appendCList _ e = throwError $ TypeCheckerBug ("appendCList expected a list, got " <> show e)
 infer (CUIdentifier (B builtin)) = do
   t <- builtinType builtin >>= instantiate
   return (t, CTIdentifier t (B builtin))
@@ -338,9 +338,9 @@ solve finalSubst constraints =
             (CRollable, TDice) -> Right ()
             (CRollable, TPool) -> Right ()
             -- Ambiguous top-level type variable
-            (c, TVar tv) -> Left $ "Ambiguous type variable " <> show tv <> " for class " <> show c
+            (c, TVar tv) -> Left $ AmbiguousTypeVar tv c
             -- Missing instance
-            (c, t') -> Left $ "No instance for " <> show c <> " for type " <> show t'
+            (c, t') -> Left $ MissingInstance c t'
 
 typeCheck :: CoreUntypedExpr -> Either TypeError CoreTypedExpr
 typeCheck expr = do

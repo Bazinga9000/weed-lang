@@ -1,6 +1,7 @@
 module Tests.TypeChecker (typeCheckerTests) where
 
 import AST
+import Formatting.Pretty
 import Test.Tasty
 import Test.Tasty.HUnit
 import TypeChecker
@@ -22,7 +23,7 @@ getType (CTMapPool t _ _) = t
 
 assertType :: CoreUntypedExpr -> WeedType -> Assertion
 assertType expr expectedType = case typeCheck expr of
-  Left err -> (assertFailure . toString) $ "Type checking failed with error: " <> err
+  Left err -> (assertFailure . toString) $ "Type checking failed with error: " <> prettyPrint err
   Right typedExpr -> getType typedExpr @?= expectedType
 
 assertTypeError :: CoreUntypedExpr -> Assertion

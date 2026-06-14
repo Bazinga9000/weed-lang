@@ -149,6 +149,14 @@ instance Pretty EvaluationError where
   prettyPrint InfiniteRecursiveBinding = "Mutually recursive let block contained strictly evaluated bindings (would <<loop>>)"
   prettyPrint (InterpreterBug s) = "Interpreter bug: " <> s
 
+instance Pretty TypeError where
+  prettyPrint (UnboundIdentifier n) = "Unbound identifier: " <> show n
+  prettyPrint (InfiniteType tv t) = "Infinite type: " <> prettyPrint tv <> " occurs in " <> prettyPrint t
+  prettyPrint (CouldNotUnify t1 t2) = "Could not unify " <> prettyPrint t1 <> " and " <> prettyPrint t2
+  prettyPrint (AmbiguousTypeVar tv c) = "Ambiguous type variable " <> prettyPrint tv <> " for class " <> prettyPrint c
+  prettyPrint (MissingInstance c t) = "No instance for " <> prettyPrint c <> " for type " <> prettyPrint t
+  prettyPrint (TypeCheckerBug s) = "Type checker bug: " <> s
+
 instance (Pretty l, Pretty r) => Pretty (Either l r) where
   prettyPrint (Left l) = prettyPrint l
   prettyPrint (Right r) = prettyPrint r

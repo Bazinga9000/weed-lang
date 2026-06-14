@@ -1,11 +1,18 @@
 module TypeChecker.Types where
 
-type TypeError = Text
+data TypeError
+  = UnboundIdentifier Text
+  | InfiniteType TypeVarName WeedType
+  | CouldNotUnify WeedType WeedType
+  | AmbiguousTypeVar TypeVarName WeedTypeClass
+  | MissingInstance WeedTypeClass WeedType
+  | TypeCheckerBug Text
+  deriving (Show, Eq)
 
 -- functor: implemented by [], Dice, Pool
 -- monad: implemented by Dice, Pool
 -- rollable: implemented by Dice, Pool
-data WeedTypeClass = CFunctor | CMonad | CRollable deriving (Show)
+data WeedTypeClass = CFunctor | CMonad | CRollable deriving (Show, Eq)
 
 newtype TypeVarName = TypeVarName Int deriving (Show, Eq, Ord)
 
