@@ -55,6 +55,7 @@ library
                     , Formatting.ANSI
                     , Formatting.Metadata
                     , Formatting.Pretty
+                    , TowerNumber.Internal.Core
                     , TowerNumber.Core
                     , TowerNumber.Utils
                     , TowerNumber.Parse
