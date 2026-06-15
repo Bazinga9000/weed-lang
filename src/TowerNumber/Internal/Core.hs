@@ -3,6 +3,7 @@ module TowerNumber.Internal.Core where
 import Data.Complex
 import Data.Ratio (approxRational)
 import Numeric (log)
+import TowerNumber.Internal.Ops
 import TowerNumber.Utils
 
 -- just to make things a bit terser
@@ -117,31 +118,6 @@ lift1TransID (idIn, idOut) f n = case downcast n of
 
 lift2Trans :: F2 (Complex Double) -> F2 TowerNumber
 lift2Trans f a b = downcast . CD . uncurry f . bimapBoth unsafeUpcast $ (a, b)
-
--- helpers to get around the need for a realfloat instance
-compwiseCR :: F2 Rational -> F2 (Complex Rational)
-compwiseCR f (a :+ b) (c :+ d) = f a c :+ f b d
-
-addCR :: Complex Rational -> Complex Rational -> Complex Rational
-addCR = compwiseCR (+)
-
-mulCR :: Complex Rational -> Complex Rational -> Complex Rational
-mulCR (a :+ b) (c :+ d) = (a * c - b * d) :+ (a * d + b * c)
-
-negCR :: Complex Rational -> Complex Rational
-negCR (a :+ b) = negate a :+ negate b
-
--- (a + bi)/(c + di) = ((ac + bd) + (bc - ad)i) / (c^2 + d^2)
-divCR :: Complex Rational -> Complex Rational -> Complex Rational
-divCR (a :+ b) (c :+ d) =
-  let den = c * c + d * d
-   in ((a * c + b * d) / den) :+ ((b * c - a * d) / den)
-
--- 1 / (a + bi) = (a - bi) / (a^2 + b^2)
-recipCR :: Complex Rational -> Complex Rational
-recipCR (a :+ b) =
-  let den = a * a + b * b
-   in (a / den) :+ (negate b / den)
 
 instance Num TowerNumber where
   (+) = lift2 addCR (+)
