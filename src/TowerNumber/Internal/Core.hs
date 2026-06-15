@@ -49,6 +49,7 @@ downcast (CR (x :+ 0)) = R x
 downcast (CR cr) = CR cr
 downcast (CD (x :+ y))
   | isNaN x || isNaN y = N
+  | y == 0 = downcast (D x) -- todo: epsilon? though if we use an epsilon everywhere this destroys the reason for using double (small numbers) and not just fixed precision
   | otherwise = case (,) <$> tryInteger x <*> tryInteger y of
       Just (ix, iy) -> downcast $ CR $ toRational ix :+ toRational iy
       Nothing -> CD $ x :+ y
