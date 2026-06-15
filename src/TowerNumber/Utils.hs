@@ -1,6 +1,8 @@
 module TowerNumber.Utils where
 
-import Data.Ratio ((%))
+import Data.Complex
+import Data.Ratio (approxRational, (%))
+import TowerNumber.Internal.Ops
 
 -- smart root finder
 smartNatRoot :: Natural -> Natural -> Either Double Natural
@@ -31,3 +33,19 @@ exactRoot n r
        in case (smartNatRoot n num, smartNatRoot n den) of
             (Right rn, Right rd) -> Just (toInteger rn % toInteger rd)
             _ -> Nothing
+
+exactComplexRoot :: Natural -> Complex Rational -> Maybe (Complex Rational)
+exactComplexRoot 0 _ = Nothing
+exactComplexRoot 1 c = Just c
+exactComplexRoot n target@(r :+ i) =
+  let -- generate all nth roots of unity as double
+      cd = fromRational r :+ fromRational i :: Complex Double
+      principal = cd ** (1 / fromIntegral n)
+      angles = [2 * pi * fromIntegral k / fromIntegral n | k <- [0 .. n - 1]]
+      allRoots = [principal * exp (0 :+ theta) | theta <- angles]
+      -- approximate them as rationals
+      epsilon = 1e-10
+      snap x = approxRational x epsilon
+      guesses = [snap (realPart root) :+ snap (imagPart root) | root <- allRoots]
+   in -- get the first one that matches (or nothing)
+      listToMaybe [g | g <- guesses, g `powC` n == target]

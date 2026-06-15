@@ -187,7 +187,12 @@ instance Floating TowerNumber where
                 if q == 2
                   then sqrt x ^^ p
                   else lift2Trans (**) x y
-            CR _ -> if q == 2 then sqrt x ^^ p else lift2Trans (**) x y
+            CR cx ->
+              if q == 2 -- this is a square root, do the fast path
+                then sqrt x ^^ p
+                else case exactComplexRoot q cx of -- otherwise, try the root-of-unity snap-double-to-rational guess-and-check method
+                  Just root -> CR root ^^ p
+                  Nothing -> lift2Trans (**) x y -- okay fine give up and be inexact
             _ -> lift2Trans (**) x y
     _ -> lift2Trans (**) x y
 
@@ -213,7 +218,7 @@ instance Floating TowerNumber where
                 then lift2Trans logBase b x
                 else
                   let -- guess a rational
-                      guess = approxRational approxFloat 1e-9
+                      guess = approxRational approxFloat 1e-10
                    in -- if the guess is correct, use it
                       case downcast (R rb ** R guess) of
                         R exactResult | exactResult == rx -> R guess
