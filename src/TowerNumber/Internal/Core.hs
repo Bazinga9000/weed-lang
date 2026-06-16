@@ -173,6 +173,7 @@ instance Floating TowerNumber where
             Nothing -> lift1Trans sqrt (CR (rx :+ ry))
     _ -> lift1Trans sqrt x
 
+  _ ** 0 = 1
   N ** _ = N
   _ ** N = N
   x ** y = case downcast y of

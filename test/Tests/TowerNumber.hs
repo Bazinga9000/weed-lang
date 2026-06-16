@@ -145,7 +145,7 @@ prop_N_absorbing x =
       check "recip N" (recip N),
       check "sqrt N" (sqrt N),
       check "x ** N" (x ** N),
-      check "N ** x" (N ** x),
+      check "N ** x" (if x == 0 then N else N ** x), -- escape hatch because IEEE
       check "exp N" (exp N),
       check "log N" (log N),
       check "sin N" (sin N),
