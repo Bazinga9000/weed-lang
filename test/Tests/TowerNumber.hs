@@ -24,12 +24,17 @@ genDouble = choose (-100.0, 100.0)
 instance Arbitrary TowerNumber where
   arbitrary =
     frequency
-      [ (8, R <$> genRational),
-        (8, D <$> genDouble),
-        (4, CR <$> ((:+) <$> genRational <*> genRational)),
-        (4, CD <$> ((:+) <$> genDouble <*> genDouble)),
+      [ (12, R <$> genRational),
+        (12, D <$> genDouble),
+        (6, CR <$> ((:+) <$> genRational <*> genRational)),
+        (6, CD <$> ((:+) <$> genDouble <*> genDouble)),
+        -- weirdos
         (1, pure N),
-        (1, pure 0)
+        (1, pure 0),
+        (1, pure $ D (1 / 0)),
+        (1, pure $ D (-1 / 0)),
+        (1, pure $ CD $ 0 :+ (1 / 0)),
+        (1, pure $ CD $ (1 / 0) :+ (1 / 0))
       ]
 
 genExactTN :: Gen TowerNumber
@@ -50,6 +55,12 @@ genGaussianInteger = do
 isN :: TowerNumber -> Bool
 isN N = True
 isN _ = False
+
+isFinite :: TowerNumber -> Bool
+isFinite (D d) = not (isInfinite d || isNaN d)
+isFinite (CD (r :+ i)) = not (isInfinite r || isInfinite i || isNaN r || isNaN i)
+isFinite N = False
+isFinite _ = True -- R and CR are always perfectly exact and finite
 
 isExact :: TowerNumber -> Bool
 isExact (R _) = True
@@ -169,7 +180,7 @@ case_complexNaN_downcasts_to_N = testCase "NaNi downcasts to N" $ N @=? (downcas
 -- Fractionality: |z - ⌊z⌋| < 1
 prop_apl_fractionality :: TowerNumber -> Property
 prop_apl_fractionality z =
-  not (isN z) ==>
+  isFinite z ==>
     magAsDouble (z - tnFloor z) < 1.0
 
 -- Integrity: ⌊⌊z⌋ = ⌊z⌋
@@ -187,7 +198,7 @@ prop_apl_translation z = not (isN z) ==>
 -- Convexity: If ⌊z⌋ = g and ⌊w⌋ = g, then for t in [0,1], ⌊t*z + (1-t)*w⌋ = g
 prop_apl_convexity :: TowerNumber -> Double -> Double -> Double -> Property
 prop_apl_convexity z dr di t' =
-  not (isN z) ==>
+  isFinite z ==>
     let t = abs t' `min` 1.0
         -- perturb z slightly to generate w, making it highly likely
         -- to fall in the same floor bucket without exhausting max discards.

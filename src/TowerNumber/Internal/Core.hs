@@ -241,8 +241,14 @@ complexFloor (r :+ i)
     x = r - fl r
     y = i - fl i
 
+-- guard so that inf (or a NaN that somehow made it this far) is just handed back
+weirdoProofCDFloor :: Complex Double -> Complex Double
+weirdoProofCDFloor c@(r :+ i)
+  | isInfinite r || isInfinite i || isNaN r || isNaN i = c
+  | otherwise = complexFloor c
+
 tnFloor :: TowerNumber -> TowerNumber
-tnFloor = lift1 complexFloor complexFloor
+tnFloor = lift1 complexFloor weirdoProofCDFloor
 
 tnCeil :: TowerNumber -> TowerNumber
 tnCeil = negate . tnFloor . negate
