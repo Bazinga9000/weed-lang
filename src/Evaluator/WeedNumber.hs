@@ -48,6 +48,8 @@ instance Floating WeedNumber where
   exp = lift1WN exp
   log = lift1WN log
   sqrt = lift1WN sqrt
+  (**) = lift2WN (**)
+  logBase = lift2WN logBase
   sin = lift1WN sin
   cos = lift1WN cos
   tan = lift1WN tan
