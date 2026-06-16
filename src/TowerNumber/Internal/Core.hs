@@ -182,11 +182,12 @@ instance Floating TowerNumber where
             R rx -> case exactRoot q rx of
               Just root -> R root ^^ p
               Nothing ->
-                -- fall back to square root to try and get complexes
-                -- can't fall back to any other perfect powers because of trig
+                -- fall back to square root or complex root finder to try and get complexes
                 if q == 2
                   then sqrt x ^^ p
-                  else lift2Trans (**) x y
+                  else case exactComplexRoot q (rx :+ 0) of
+                    Just root -> CR root ^^ p
+                    Nothing -> lift2Trans (**) x y
             CR cx ->
               if q == 2 -- this is a square root, do the fast path
                 then sqrt x ^^ p
