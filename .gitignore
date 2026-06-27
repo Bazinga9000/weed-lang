@@ -1,2 +1,5 @@
 result
 dist-newstyle
+
+# Live rebuilds of the spec
+spec/spec.pdf

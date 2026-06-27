@@ -81,7 +81,7 @@ infer (CUApply f arg) = do
       let rules = case tf' of
             -- f :: a -> b is unwrapped
             TFunction texp tret ->
-              [ -- Rule 1: Pool Mapping
+              [ -- Pool Mapping
                 case (texp, ta') of
                   (TApp TList texpInner, TApp TPool taInner) -> do
                     -- check the unification without actually doing it
@@ -95,14 +95,14 @@ infer (CUApply f arg) = do
                       else
                         return Nothing
                   _ -> return Nothing,
-                -- Rule 2: Pool Collapse (Direct)
+                -- Pool Collapse (Direct)
                 case (texp, ta') of
                   (TApp TDice TNumber, TApp TPool TNumber) -> do
                     unify tret tr
                     (_, collapseCall) <- call1 Collapse ta' ca
                     return $ Just (tret, CTApply tret cf collapseCall)
                   _ -> return Nothing,
-                -- Also Rule 2: Pool Collapse (Implicit, 3a)
+                -- Pool Collapse (Indirect)
                 case (texp, ta') of
                   (TNumber, TApp TPool TNumber) -> do
                     (tCollapsed, collapseCall) <- call1 Collapse ta' ca
@@ -111,7 +111,7 @@ infer (CUApply f arg) = do
                     unify tr tFMapped
                     return $ Just (tFMapped, fmapCall)
                   _ -> return Nothing,
-                -- Rule 3a: Implicit FMap
+                -- Implicit map
                 case ta' of
                   TApp tWrapper taInner -> do
                     ok <- unifyPeek texp taInner
@@ -124,7 +124,7 @@ infer (CUApply f arg) = do
                         return $ Just (tRes, fmapCall)
                       else return Nothing
                   _ -> return Nothing,
-                -- Rule 4: Scalar Promotion (Direct)
+                -- Scalar Promotion (Direct)
                 case texp of
                   TApp tWrapper texpInner | not (isDiceOrPool ta') -> do
                     ok <- unifyPeek texpInner ta'
@@ -141,9 +141,11 @@ infer (CUApply f arg) = do
               ]
             -- f :: m (a -> b) is wrapped
             TApp tWrapper (TFunction taInner _) ->
-              [ -- Rule 2: Pool Collapse (Applicative)
+              [ -- Pool Collapse (Applicative)
                 -- f is Dice (a -> b), arg is Pool a
-                --
+                -- this fails to typecheck if a != Number
+                -- but for ease of comprehension we write the general
+                -- case
                 case (tWrapper, ta') of
                   (TDice, TApp TPool taActual) -> do
                     ok <- unifyPeek taInner taActual
@@ -157,7 +159,7 @@ infer (CUApply f arg) = do
                         return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing,
-                -- Rule 3b: Implicit Applicative <*>
+                -- Implicit Applicative <*>
                 case ta' of
                   TApp targWrapper taActual -> do
                     ok <- unifyPeek taInner taActual
@@ -171,7 +173,7 @@ infer (CUApply f arg) = do
                         return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing,
-                -- Rule 4: Scalar Promotion (Indirect)
+                -- Scalar Promotion (Indirect)
                 case ta' of
                   _ | not (isDiceOrPool ta') -> do
                     ok <- unifyPeek taInner ta'
