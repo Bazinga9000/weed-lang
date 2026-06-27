@@ -40,6 +40,23 @@
             };
           };
 
+          packages.spec = pkgs.stdenvNoCC.mkDerivation {
+            pname = "weed-lang-spec";
+            version = "0.1.0";
+            src = ./spec;
+            nativeBuildInputs = [ pkgs.typst ];
+
+            buildPhase = ''
+              export XDG_CACHE_HOME=$(mktemp -d)
+              typst compile spec.typ
+            '';
+
+            installPhase = ''
+              mkdir -p $out
+              cp spec.pdf $out/
+            '';
+          };
+
           packages.default = self'.packages.weed-lang;
         };
     };
