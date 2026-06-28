@@ -7,7 +7,7 @@ maintainer:      bazninethousand@gmail.com
 build-type:      Simple
 
 flag dev
-  description: Disable warnings-as-errors for faster development
+  description: Be less pedantic for rapid rebuilds
   default: False
   manual: True
 
@@ -25,7 +25,7 @@ common shared-config
         lens,
         QuickCheck
     mixins:
-        base hiding (Prelude),
+        base hiding (Prelude)
 
 library
     import:           shared-config
@@ -60,13 +60,6 @@ library
                     , TowerNumber.Core
                     , TowerNumber.Utils
                     , TowerNumber.Parse
-
-executable weed
-    import:           shared-config
-    main-is:          Main.hs
-    hs-source-dirs:   app
-    build-depends:    weed-lang
-                    , haskeline
 
 test-suite test-weed
     import:           shared-config

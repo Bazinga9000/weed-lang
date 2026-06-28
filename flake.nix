@@ -57,7 +57,7 @@
             '';
           };
 
-          packages.default = self'.packages.weed-lang;
+          packages.default = self'.packages.weed-repl;
         };
     };
 }
