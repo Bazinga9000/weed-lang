@@ -40,8 +40,8 @@
             };
           };
 
-          packages.spec = pkgs.stdenvNoCC.mkDerivation {
-            pname = "weed-lang-spec";
+          packages.weed-spec = pkgs.stdenvNoCC.mkDerivation {
+            pname = "weed-spec";
             version = "0.1.0";
             src = ./spec;
             nativeBuildInputs = [ pkgs.typst ];
