@@ -60,6 +60,7 @@ library
                     , TowerNumber.Core
                     , TowerNumber.Utils
                     , TowerNumber.Parse
+                    , Pipeline
 
 test-suite test-weed
     import:           shared-config

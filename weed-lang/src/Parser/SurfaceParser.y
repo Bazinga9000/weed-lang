@@ -1,10 +1,11 @@
 {
-module Parser.SurfaceParser where
+module Parser.SurfaceParser (parseSurface, ParseError(..)) where
 import Parser.Lexer
 import AST
 }
 %name parseSurface Exp
 %tokentype { Token }
+%monad { P } { (>>=) } { return }
 %error { parseError }
 
 %token
@@ -188,6 +189,12 @@ BinOp : '.' { "." }
       | '$' { "$" }
 
 {
-parseError :: [Token] -> a
-parseError = error "Parse error"
+
+-- TODO: better parse errors
+type P = Either ParseError
+
+newtype ParseError = ParseError [Token] deriving Show
+
+parseError :: [Token] -> P a
+parseError = Left . ParseError
 }

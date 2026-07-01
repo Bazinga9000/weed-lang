@@ -6,8 +6,12 @@ import Parser.SurfaceParser (parseSurface)
 import Test.Tasty
 import Test.Tasty.HUnit
 
+-- no parser tests check for parse errors right now,
+-- so we shim this
 parse :: [Token] -> SurfaceExpr
-parse = parseSurface
+parse toks = case parseSurface toks of
+  Left e -> error $ show e
+  Right se -> se
 
 sMap :: SurfaceExpr -> SurfaceExpr -> SurfaceExpr
 sMap f = SApply (SApply (SIdentifier (S "map")) f)
