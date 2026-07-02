@@ -8,9 +8,9 @@ import Parser.SurfaceParser
 import TypeChecker
 
 -- the full pipeline for an expression
-interpret :: String -> IO (Either Text Text)
+interpret :: (ToString s) => s -> IO (Either Text Text)
 interpret input = do
-  let toks = scanTokens input
+  let toks = scanTokens $ toString input
   case parseSurface toks of
     Left (ParseError ts) -> return $ Left $ "Parse error: " <> show ts
     Right surface -> case lower surface of
