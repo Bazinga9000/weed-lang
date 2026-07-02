@@ -32,4 +32,5 @@ executable weed
     main-is:          Main.hs
     hs-source-dirs:   app
     build-depends:    weed-lang
+                    , directory
                     , discord-haskell
