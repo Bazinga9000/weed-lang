@@ -34,3 +34,7 @@ executable weed
     build-depends:    weed-lang
                     , directory
                     , discord-haskell
+    other-modules:    Commands,
+                      Commands.Core,
+                      Commands.Ping,
+                      Formatting
