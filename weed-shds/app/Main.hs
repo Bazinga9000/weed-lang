@@ -27,7 +27,7 @@ main = do
   exitFailure
 
 commands :: [SlashCommand]
-commands = [ping]
+commands = [ping, roll]
 
 onDiscordEvent :: Event -> DiscordHandler ()
 onDiscordEvent = \case
@@ -38,8 +38,8 @@ onDiscordEvent = \case
 onReady :: ApplicationId -> User -> DiscordHandler ()
 onReady appId user = do
   good $ "WEED-SHDS - Bot ready!"
-  good $ "App ID: " <> show appId
-  good $ "User: " <> userName user
+  echo $ "App ID: " <> show appId
+  echo $ "User: " <> userName user
   updateCommandRegistrations appId commands
 
 onInteractionCreate :: Interaction -> DiscordHandler ()

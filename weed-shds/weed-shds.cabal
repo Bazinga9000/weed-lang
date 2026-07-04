@@ -37,4 +37,5 @@ executable weed
     other-modules:    Commands,
                       Commands.Core,
                       Commands.Ping,
+                      Commands.Roll,
                       Formatting
