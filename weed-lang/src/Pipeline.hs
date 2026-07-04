@@ -1,6 +1,7 @@
 module Pipeline where
 
 import Evaluator
+import Evaluator.Types
 import Formatting.Pretty (prettyPrint)
 import Parser.Lexer
 import Parser.Lowerer
@@ -8,7 +9,7 @@ import Parser.SurfaceParser
 import TypeChecker
 
 -- the full pipeline for an expression
-interpret :: (ToString s) => s -> IO (Either Text Text)
+interpret :: (ToString s) => s -> IO (Either Text (Text, Maybe Text))
 interpret input = do
   let toks = scanTokens $ toString input
   case parseSurface toks of
@@ -21,4 +22,13 @@ interpret input = do
           ev <- evaluate coret
           case ev of
             Left err -> return $ Left $ "Evaluation error: " <> prettyPrint err
-            Right v -> return $ Right $ prettyPrint v
+            Right v -> return $ Right $ (prettyPrint v, prettyPrint <$> autoSum v)
+
+-- collapses (nested) lists of numbers into their sum
+autoSum :: Value -> Maybe Value
+autoSum (VList []) = Nothing -- untyped empty lists don't count
+autoSum v = VNumber <$> as' v
+  where
+    as' (VNumber n) = Just n
+    as' (VList l) = foldlM (\a b -> (+ a) <$> b) 0 $ map as' l
+    as' _ = Nothing
