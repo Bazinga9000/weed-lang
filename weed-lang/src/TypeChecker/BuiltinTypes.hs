@@ -70,6 +70,13 @@ builtinType Map = do
   let tb = TVar b
   let f' = TApp (TVar f)
   return $ ForAll [f, a, b] [CInstanceOf CFunctor (TVar f)] ((ta ->> tb) ->> f' ta ->> f' tb)
+builtinType MapP = do
+  -- ([a] -> b) -> Pool a -> Dice b
+  a <- fresh
+  b <- fresh
+  let ta = TVar a
+  let tb = TVar b
+  return $ ForAll [a, b] [] ((TApp TList ta ->> tb) ->> (TApp TPool ta) ->> (TApp TDice tb))
 builtinType Ap = do
   m <- fresh
   a <- fresh

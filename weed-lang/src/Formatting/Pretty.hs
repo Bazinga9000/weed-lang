@@ -64,6 +64,7 @@ instance Pretty Builtin where
   prettyPrint Xor = "xor"
   prettyPrint Identity = "id"
   prettyPrint Map = "map"
+  prettyPrint MapP = "mapP"
   prettyPrint Ap = "ap"
   prettyPrint Return = "return"
   prettyPrint Bind = "bind"
@@ -118,7 +119,6 @@ instance Pretty CoreTypedExpr where
   prettyPrint (CTLet t decl e2) = "(let " <> prettyPrint decl <> " in " <> prettyPrint e2 <> " ::" <> prettyPrint t <> ")"
   prettyPrint (CTLetRec t decls body) = "(let " <> prettyPrint decls <> " in " <> prettyPrint body <> "::" <> prettyPrint t <> ")"
   prettyPrint (CTIf t cond tb fb) = "(if " <> prettyPrint cond <> " then " <> prettyPrint tb <> " else " <> prettyPrint fb <> "::" <> prettyPrint t <> ")"
-  prettyPrint (CTMapPool t f pool) = "(map " <> prettyPrint f <> " " <> prettyPrint pool <> "::" <> prettyPrint t <> ")"
 
 instance Pretty TowerNumber where
   prettyPrint = formatTN
@@ -213,7 +213,3 @@ displayTypedAST e = unlines $ snd $ runWriter $ runReaderT (mkTree e) 0
       local (+ 1) (mkTree e2)
       tellAtDepth ["|- else"]
       local (+ 1) (mkTree e3)
-    mkTree (CTMapPool t e1 e2) = do
-      tellAtDepth ["|- mapPool :: " <> prettyPrint t]
-      local (+ 1) (mkTree e1)
-      local (+ 1) (mkTree e2)

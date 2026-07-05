@@ -8,19 +8,6 @@ import TypeChecker
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
 
-getType :: CoreTypedExpr -> WeedType
-getType (CTNumber _) = TNumber
-getType (CTBool _) = TBool
-getType CTUnit = TUnit
-getType (CTList t _) = t
-getType (CTIdentifier t _) = t
-getType (CTLambda t _ _) = t
-getType (CTApply t _ _) = t
-getType (CTLet t _ _) = t
-getType (CTLetRec t _ _) = t
-getType (CTIf t _ _ _) = t
-getType (CTMapPool t _ _) = t
-
 assertType :: CoreUntypedExpr -> WeedType -> Assertion
 assertType expr expectedType = case typeCheck expr of
   Left err -> (assertFailure . toString) $ "Type checking failed with error: " <> prettyPrint err

@@ -98,16 +98,6 @@ eval (CTIf _ cond t f) = do
           vs <- p
           mapM runCond vs
     _ -> throwError $ InterpreterBug "Evaluator got a non-boolean condition"
-eval (CTMapPool _ f p) = do
-  f' <- eval f
-  p' <- eval p
-  case p' of
-    VPool pool _ -> do
-      env <- ask
-      return $ VDice $ do
-        rolls <- pool
-        applyValueRoll env f' (VList rolls)
-    _ -> throwError $ InterpreterBug "Evaluator got a non-pool argument"
 
 -- eval (CTMap _ f v) = do
 -- eval (CTAp t mf ma) = do

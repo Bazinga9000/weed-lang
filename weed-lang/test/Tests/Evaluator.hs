@@ -44,6 +44,15 @@ vNum n = VNumber (literal $ fromInteger n)
 cNum :: Integer -> CoreTypedExpr
 cNum n = CTNumber (fromInteger n)
 
+-- emulate the skeleton of the AST CTMapPool
+cMapPool :: WeedType -> CoreTypedExpr -> CoreTypedExpr -> CoreTypedExpr
+cMapPool ty f p =
+  CTApply ty pa p
+  where
+    pa = CTApply (tp ->> ty) (CTIdentifier (tf ->> tp ->> ty) (B MapP)) f
+    tf = getType f
+    tp = getType p
+
 tNum :: WeedType
 tNum = TNumber
 
@@ -131,7 +140,7 @@ evaluatorTests =
         -- (they're in the moand box)
         [ testCase "7d6 | sum evaluates" $ do
             let input =
-                  CTMapPool
+                  cMapPool
                     tDiceNum
                     (CTIdentifier (TFunction tListNum tNum) (B Sum))
                     ( CTApply

@@ -211,6 +211,7 @@ builtinEnv =
     ("id", Identity),
     ("map", Map),
     ("fmap", Map),
+    ("mapP", MapP),
     ("ap", Ap),
     ("bind", Bind),
     -- dice are already builtins at this step

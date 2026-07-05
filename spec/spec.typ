@@ -584,6 +584,20 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 ]
 
 #builtin(
+  "mapP",
+  "([a] -> b) -> Pool a -> Dice b",
+  "Structures",
+  examples: [
+    ```hs
+    mapP sum (20d6) -- A die rolling the single sum value
+    -- (mapP sum) is implicitly called quite often when working with Pools of Numbers
+    ```
+  ],
+)[
+  Apply a function to the results of a Pool in aggregate, collapsing it into a Dice.
+]
+
+#builtin(
   "return",
   "Monad m => a -> m a",
   "Structures",

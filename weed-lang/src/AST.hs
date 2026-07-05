@@ -51,6 +51,7 @@ data Builtin -- unary operators
   | -- monads
     Identity
   | Map
+  | MapP
   | Ap
   | Return
   | Bind
@@ -117,7 +118,22 @@ data CoreTypedExpr
   | CTLet WeedType (Declaration CoreTypedExpr) CoreTypedExpr
   | CTLetRec WeedType [Declaration CoreTypedExpr] CoreTypedExpr
   | CTIf WeedType CoreTypedExpr CoreTypedExpr CoreTypedExpr
-  | CTMapPool WeedType CoreTypedExpr CoreTypedExpr -- Maps ([a] -> b) over Pool a -> Dice b
-  deriving (Show, Eq)
+  deriving
+    ( -- | CTMapPool WeedType CoreTypedExpr CoreTypedExpr -- Maps ([a] -> b) over Pool a -> Dice b
+      Show,
+      Eq
+    )
 
 type CoreTypedModule = Module CoreTypedExpr
+
+getType :: CoreTypedExpr -> WeedType
+getType (CTNumber _) = TNumber
+getType (CTBool _) = TBool
+getType CTUnit = TUnit
+getType (CTList t _) = t
+getType (CTIdentifier t _) = t
+getType (CTLambda t _ _) = t
+getType (CTApply t _ _) = t
+getType (CTLet t _ _) = t
+getType (CTLetRec t _ _) = t
+getType (CTIf t _ _ _) = t

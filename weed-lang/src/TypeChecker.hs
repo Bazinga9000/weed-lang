@@ -90,8 +90,9 @@ infer (CUApply f arg) = do
                       then do
                         -- if it works, commit
                         unify texpInner taInner
-                        let mapped = TApp TDice tret
-                        return $ Just (mapped, CTMapPool mapped cf ca)
+                        (tMapPed, mapPCall) <- call2 MapP tf' cf ta' ca
+                        unify tr tMapPed
+                        return $ Just (tMapPed, mapPCall)
                       else
                         return Nothing
                   _ -> return Nothing,
