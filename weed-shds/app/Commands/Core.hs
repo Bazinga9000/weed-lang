@@ -22,7 +22,7 @@ updateCommandRegistrations appId commands = do
   let goodCount = total - badCount
   echo $ "(" <> show goodCount <> "/" <> show total <> ") command" <> (if goodCount == 1 then "" else "s") <> " registered"
   if badCount /= 0
-    then pure ()
+    then pass
     else do
       echo "Unregistering outdated commands..."
       unregisterOutdatedCmds appId $ catMaybes regs

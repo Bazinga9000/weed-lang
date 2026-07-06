@@ -32,7 +32,7 @@ instance Arbitrary TowerNumber where
         (1, pure N),
         (1, pure 0),
         (1, pure $ D (1 / 0)),
-        (1, pure $ D (-1 / 0)),
+        (1, pure $ D (-(1 / 0))),
         (1, pure $ CD $ 0 :+ (1 / 0)),
         (1, pure $ CD $ (1 / 0) :+ (1 / 0))
       ]
@@ -169,10 +169,10 @@ prop_N_absorbing x =
         result === N
 
 case_NaN_downcasts_to_N :: TestTree
-case_NaN_downcasts_to_N = testCase "NaN downcasts to N" $ N @=? (downcast $ D $ 0 / 0)
+case_NaN_downcasts_to_N = testCase "NaN downcasts to N" $ N @=? downcast (D $ 0 / 0)
 
 case_complexNaN_downcasts_to_N :: TestTree
-case_complexNaN_downcasts_to_N = testCase "NaNi downcasts to N" $ N @=? (downcast $ CD $ 0 :+ (0 / 0))
+case_complexNaN_downcasts_to_N = testCase "NaNi downcasts to N" $ N @=? downcast (CD $ 0 :+ (0 / 0))
 
 -- complex floor semantics
 -- see https://www.aplwiki.com/wiki/Complex_floor

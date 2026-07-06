@@ -18,9 +18,7 @@ unwrapTimeout (Just a) = a
 fetchUserName :: MemberOrUser -> Text
 fetchUserName (MemberOrUser (Left gm)) = case memberNick gm of
   Just name -> name
-  Nothing -> case memberUser gm of
-    Nothing -> "?????"
-    Just user -> userName user
+  Nothing -> maybe "?????" userName (memberUser gm)
 fetchUserName (MemberOrUser (Right u)) = userName u
 
 clamp :: Text -> Maybe Text
@@ -57,7 +55,7 @@ roll =
       handler = \intr -> \case
         Just (OptionsDataValues [OptionDataValueString "die" (Right input)]) ->
           do
-            interpreted <- unwrapTimeout <$> (liftIO $ timeout 1_000_000_000 $ interpret input)
+            interpreted <- unwrapTimeout <$> liftIO (timeout 1_000_000_000 $ interpret input)
 
             let preamble = unwords [fetchUserName (interactionUser intr) <> "'s", "roll", "`" <> input <> "`"]
             let out =

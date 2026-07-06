@@ -76,7 +76,7 @@ builtinType MapP = do
   b <- fresh
   let ta = TVar a
   let tb = TVar b
-  return $ ForAll [a, b] [] ((TApp TList ta ->> tb) ->> (TApp TPool ta) ->> (TApp TDice tb))
+  return $ ForAll [a, b] [] ((TApp TList ta ->> tb) ->> TApp TPool ta ->> TApp TDice tb)
 builtinType Ap = do
   m <- fresh
   a <- fresh

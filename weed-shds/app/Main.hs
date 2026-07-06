@@ -6,7 +6,6 @@ import Discord.Interactions
 import Discord.Types
 import Formatting
 import System.Directory
-import System.Environment
 
 main :: IO ()
 main = do
@@ -33,11 +32,11 @@ onDiscordEvent :: Event -> DiscordHandler ()
 onDiscordEvent = \case
   Ready _ user _ _ _ _ (PartialApplication appId _) -> onReady appId user
   InteractionCreate intr -> onInteractionCreate intr
-  _ -> pure ()
+  _ -> pass
 
 onReady :: ApplicationId -> User -> DiscordHandler ()
 onReady appId user = do
-  good $ "WEED-SHDS - Bot ready!"
+  good "WEED-SHDS - Bot ready!"
   echo $ "App ID: " <> show appId
   echo $ "User: " <> userName user
   updateCommandRegistrations appId commands
@@ -54,7 +53,7 @@ onInteractionCreate = \case
             Nothing ->
               bad $ "Got unknown slash command " <> inputName <> " (registrations out of date?)"
   _ ->
-    pure () -- Unexpected/unsupported interaction type
+    pass -- Unexpected/unsupported interaction type
 
 fetchTokenOrError :: IO Text
 fetchTokenOrError = do
@@ -69,7 +68,7 @@ fetchTokenOrError = do
 
 fetchToken :: IO (Maybe Text)
 fetchToken = do
-  tokenFile <- System.Environment.lookupEnv "TOKEN_FILE"
+  tokenFile <- lookupEnv "TOKEN_FILE"
   case tokenFile of
     Nothing -> fetchTokenText
     Just filePath -> do
@@ -82,7 +81,7 @@ fetchToken = do
 
 fetchTokenText :: IO (Maybe Text)
 fetchTokenText = do
-  rawToken <- System.Environment.lookupEnv "TOKEN"
+  rawToken <- lookupEnv "TOKEN"
   case rawToken of
     Nothing -> return Nothing
     Just s -> return . Just . fromString $ s

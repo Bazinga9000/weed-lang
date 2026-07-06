@@ -22,11 +22,11 @@ interpret input = do
           ev <- evaluate coret
           case ev of
             Left err -> return $ Left $ "Evaluation error: " <> prettyPrint err
-            Right v -> return $ Right $ (prettyPrint v, prettyPrint <$> autoSum v)
+            Right v -> return $ Right (prettyPrint v, prettyPrint <$> autoSum v)
 
 -- collapses (nested) lists of numbers into their sum
 autoSum :: Value -> Maybe Value
-autoSum (VList []) = Nothing -- untyped empty lists don't count
+autoSum (VList []) = Nothing -- empty lists don't count
 autoSum v = VNumber <$> as' v
   where
     as' (VNumber n) = Just n
