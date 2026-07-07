@@ -130,7 +130,7 @@ fetchBuiltin _ Map = VBuiltin $ \f -> return $ VBuiltin $ \v -> do
       let mappedPool = pool >>= mapM (applyValueRoll env f)
       let mappedSource = source >>= applyValueRoll env f
       return $ VPool mappedPool mappedSource
-    _ -> throwError $ InterpreterBug "Evaluator got an invalid type for map"
+    _ -> throwError $ InterpreterBug "map got a non-Functor argument"
 fetchBuiltin _ MapP = VBuiltin $ \f -> return $ VBuiltin $ \p -> do
   case p of
     VPool pool _ -> do
@@ -138,7 +138,7 @@ fetchBuiltin _ MapP = VBuiltin $ \f -> return $ VBuiltin $ \p -> do
       return $ VDice $ do
         rolls <- pool
         applyValueRoll env f (VList rolls)
-    _ -> throwError $ InterpreterBug "Evaluator got a non-pool argument"
+    _ -> throwError $ InterpreterBug "mapP got a non-pool argument"
 fetchBuiltin apt Ap = VBuiltin $ \mf -> return $ VBuiltin $ \ma -> do
   env <- ask
   t <- fetchOutputType2 apt
