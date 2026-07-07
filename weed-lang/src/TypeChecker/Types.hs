@@ -48,10 +48,6 @@ mkDice = TApp TDice
 mkPool :: WeedType -> WeedType
 mkPool = TApp TPool
 
-nameOf :: WeedType -> TypeVarName
-nameOf (TVar n) = n
-nameOf _ = error "nameOf: not a TVar"
-
 isDiceOrPool :: WeedType -> Bool
 isDiceOrPool t = case t of
   TApp TDice _ -> True
