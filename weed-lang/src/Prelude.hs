@@ -20,6 +20,12 @@ toPositive k = Just $ Positive k
 fromPositive :: (Integral a) => PositiveNatural -> a
 fromPositive (Positive n) = fromInteger . toInteger $ n
 
+-- yes, i am well aware that this Num instance is unsafe, in that
+-- fromInteger and negate are bad
+-- however, haskell's numeric hierarchy is a hot mess
+-- and so fromInteger is gated behind a Num instance....
+-- this is at least as bad as the Num instance for Natural
+-- which exists in GHC so....
 instance Num PositiveNatural where
   (Positive a) + (Positive b) = Positive (a + b)
   (Positive a) * (Positive b) = Positive (a * b)
