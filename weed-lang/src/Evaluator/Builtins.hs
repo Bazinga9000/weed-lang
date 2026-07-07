@@ -145,7 +145,7 @@ fetchBuiltin apt Ap = VBuiltin $ \mf -> return $ VBuiltin $ \ma -> do
   case t of
     (TApp TList _) -> do
       lf <- assertList mf
-      la <- assertList mf
+      la <- assertList ma
       VList <$> sequence (map applyValue lf <*> la)
     (TApp TDice _) -> do
       df <- assertDice mf

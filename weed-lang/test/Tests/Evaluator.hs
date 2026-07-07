@@ -99,6 +99,23 @@ evaluatorTests =
             let apE = CTIdentifier (lFuncT ->> tListNum ->> tListNum) (B Ap)
             let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) apE listFuncs) listArgs
             assertEval expr (VList [vNum 8, vNum 8, vNum 9, vNum 9]),
+          testCase "[_ + 1, _ + 2] <*> [5, 10] -> [6, 11, 7, 12]" $ do
+            let listArgs = CTList tListNum [cNum 5, cNum 10]
+
+            let lFuncT = TApp TList (TFunction TNumber TNumber)
+            let ctAdd = CTIdentifier (TNumber ->> TNumber ->> TNumber) (B Add)
+
+            let func1Body = CTApply TNumber (CTApply (TNumber ->> TNumber) ctAdd (CTIdentifier TNumber idX)) (cNum 1)
+            let func1 = CTLambda (TFunction TNumber TNumber) idX func1Body
+
+            let func2Body = CTApply TNumber (CTApply (TNumber ->> TNumber) ctAdd (CTIdentifier TNumber idX)) (cNum 2)
+            let func2 = CTLambda (TFunction TNumber TNumber) idX func2Body
+
+            let listFuncs = CTList lFuncT [func1, func2]
+
+            let apE = CTIdentifier (lFuncT ->> tListNum ->> tListNum) (B Ap)
+            let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) apE listFuncs) listArgs
+            assertEval expr (VList [vNum 6, vNum 11, vNum 7, vNum 12]),
           testCase "[1, 2] >>= \\x -> [x, x] -> [1, 1, 2, 2]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
             let bindFunc =
