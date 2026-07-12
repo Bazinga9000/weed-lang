@@ -99,6 +99,12 @@ builtinType Bind = do
   let tb = TVar b
   let m' = TApp (TVar m)
   return $ ForAll [m, a, b] [CInstanceOf $ CMonad (TVar m)] (m' ta ->> (ta ->> m' tb) ->> m' tb)
+builtinType LiftMask = do
+  s <- fresh
+  a <- fresh
+  let ts = TVar s
+  let ta = TVar a
+  return $ ForAll [s, a] [CInstanceOf $ CSelector ts ta] (ts ->> TApp TList ta ->> TApp TList TBool)
 builtinType DiceD = dice1
 builtinType DiceS = do
   tv <- fresh

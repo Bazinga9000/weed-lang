@@ -55,6 +55,7 @@ data Builtin -- unary operators
   | Ap
   | Return
   | Bind
+  | LiftMask
   | -- primitive dice
     DiceD
   | DiceS

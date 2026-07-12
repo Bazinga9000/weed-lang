@@ -214,6 +214,7 @@ builtinEnv =
     ("mapP", MapP),
     ("ap", Ap),
     ("bind", Bind),
+    ("liftMask", LiftMask),
     -- dice are already builtins at this step
     ("constant", Constant),
     ("collapse", Collapse),

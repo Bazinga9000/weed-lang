@@ -69,6 +69,7 @@ instance Pretty Builtin where
   prettyPrint Ap = "ap"
   prettyPrint Return = "return"
   prettyPrint Bind = "bind"
+  prettyPrint LiftMask = "liftMask"
   prettyPrint DiceD = "d"
   prettyPrint DiceS = "s"
   prettyPrint DiceF = "f"

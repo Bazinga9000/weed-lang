@@ -132,7 +132,14 @@ evaluatorTests =
             let bindT = tListNum ->> (tNum ->> tListNum) ->> tListNum
             let bindE = CTIdentifier bindT (B Bind)
             let expr = CTApply tListNum (CTApply bindT bindE listArgs) bindFunc
-            assertEval expr (VList [vNum 1, vNum 1, vNum 2, vNum 2])
+            assertEval expr (VList [vNum 1, vNum 1, vNum 2, vNum 2]),
+          testCase "liftMask (_ == 1) [1, 2, 3] -> [True, False, False]" $ do
+            let listArgs = CTList tListNum [cNum 1, cNum 2, cNum 3]
+            let predicateT = tListNum ->> TApp TList TBool
+            let liftMaskT = (TNumber ->> TBool) ->> predicateT
+            let selectorFunc = (CTApply (TFunction TNumber TBool) (CTIdentifier (TFunction TNumber (TFunction TNumber TBool)) (B Eq)) (cNum 1))
+            let expr = (CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs)
+            assertEval expr (VList [VBool True, VBool False, VBool False])
         ],
       testGroup
         "Standard AST Evaluation"

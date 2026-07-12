@@ -637,6 +637,21 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 ]
 
 #builtin(
+  "liftMask",
+  "Selector s a => s -> [a] -> [Bool]",
+  "Filtering",
+  examples: [
+    ```hs
+    liftMask (_ == 1) [1, 2, 3] -- [True, False, False]
+    ```
+  ]
+)[
+  Lifts a `Selector` into the corresponding global predicate `[a] -> Bool`.
+
+  If `s = [a] -> [Bool]`, `liftMask` is the identity. If `s = a -> Bool`, `liftMask` is #ref-b("map").
+]
+
+#builtin(
   "source",
   "Rollable r => r a -> Dice a",
   "Dice",

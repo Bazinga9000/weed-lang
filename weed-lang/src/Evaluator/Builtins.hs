@@ -215,6 +215,23 @@ fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
 
       return $ VPool boundPool boundSource
     _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> prettyPrint m <> ">>=" <> prettyPrint f <> ")"
+fetchBuiltin t LiftMask =
+  let unwrapFunction :: WeedType -> [WeedType]
+      unwrapFunction (TFunction a b) = a : (unwrapFunction b)
+      unwrapFunction ty = [ty]
+
+      getLiftMaskType :: WeedType -> Either EvaluationError Bool
+      getLiftMaskType ty = case unwrapFunction ty of
+        [(TFunction (TApp TList _) (TApp TList TBool)), (TApp TList _), (TApp TList TBool)] -> return True
+        [(TFunction _ TBool), (TApp TList _), (TApp TList TBool)] -> return False
+        e -> throwError $ InterpreterBug $ "LiftMask input type was " <> prettyPrint ty <> " unwrapped as " <> prettyPrint e
+   in case (getLiftMaskType t) of
+        -- Just True: input is ([a] -> [Bool]), Just False: input is a -> Bool
+        Right True -> VBuiltin $ \f -> return $ VBuiltin $ \a -> applyValue f a
+        Right False -> VBuiltin $ \f -> return $ VBuiltin $ \a -> do
+          as <- assertList a
+          VList <$> mapM (applyValue f) as
+        Left e -> VBuiltin $ \_ -> return $ VBuiltin $ \_ -> do throwError $ e
 fetchBuiltin _ DiceD = D.d
 fetchBuiltin _ DiceS = D.s
 fetchBuiltin _ DiceF = D.f
