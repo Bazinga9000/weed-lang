@@ -119,7 +119,7 @@ fetchBuiltin _ And = liftBool2 (&&)
 fetchBuiltin _ Or = liftBool2 (||)
 fetchBuiltin _ Xor = liftBool2 (/=)
 fetchBuiltin _ Identity = VBuiltin return
-fetchBuiltin _ Map = VBuiltin $ \f -> return $ VBuiltin $ \v -> do
+fetchBuiltin _ Map = liftValue2 $ \f v -> do
   env <- ask
 
   -- map doesn't actually need to know its output type, it can be determined from the input type
@@ -131,7 +131,7 @@ fetchBuiltin _ Map = VBuiltin $ \f -> return $ VBuiltin $ \v -> do
       let mappedSource = source >>= applyValueRoll env f
       return $ VPool mappedPool mappedSource
     _ -> throwError $ InterpreterBug "map got a non-Functor argument"
-fetchBuiltin _ MapP = VBuiltin $ \f -> return $ VBuiltin $ \p -> do
+fetchBuiltin _ MapP = liftValue2 $ \f p -> do
   case p of
     VPool pool _ -> do
       env <- ask
@@ -139,7 +139,7 @@ fetchBuiltin _ MapP = VBuiltin $ \f -> return $ VBuiltin $ \p -> do
         rolls <- pool
         applyValueRoll env f (VList rolls)
     _ -> throwError $ InterpreterBug "mapP got a non-pool argument"
-fetchBuiltin apt Ap = VBuiltin $ \mf -> return $ VBuiltin $ \ma -> do
+fetchBuiltin apt Ap = liftValue2 $ \mf ma -> do
   env <- ask
   t <- fetchOutputType2 apt
   case t of
@@ -177,7 +177,7 @@ fetchBuiltin rett Return = VBuiltin $ \v -> do
     (TApp TList _) -> return $ VList [v]
     (TApp TPool _) -> return $ VPool (return . return $ v) (return v)
     _ -> throwError $ InterpreterBug "Evaluator got an invalid type for return"
-fetchBuiltin _ Bind = VBuiltin $ \m -> return $ VBuiltin $ \f -> do
+fetchBuiltin _ Bind = liftValue2 $ \m f -> do
   env <- ask
 
   case m of
@@ -227,11 +227,11 @@ fetchBuiltin t LiftMask =
         e -> throwError $ InterpreterBug $ "LiftMask input type was " <> prettyPrint ty <> " unwrapped as " <> prettyPrint e
    in case (getLiftMaskType t) of
         -- Just True: input is ([a] -> [Bool]), Just False: input is a -> Bool
-        Right True -> VBuiltin $ \f -> return $ VBuiltin $ \a -> applyValue f a
-        Right False -> VBuiltin $ \f -> return $ VBuiltin $ \a -> do
+        Right True -> liftValue2 applyValue
+        Right False -> liftValue2 $ \f a -> do
           as <- assertList a
           VList <$> mapM (applyValue f) as
-        Left e -> VBuiltin $ \_ -> return $ VBuiltin $ \_ -> do throwError $ e
+        Left e -> liftValue2 . const . const . throwError $ e
 fetchBuiltin _ DiceD = D.d
 fetchBuiltin _ DiceS = D.s
 fetchBuiltin _ DiceF = D.f
@@ -253,7 +253,7 @@ fetchBuiltin _ Source = VBuiltin source
     source (VDice d) = return $ VDice d
     source (VPool _ s) = return $ VDice s
     source e = throwError $ TypeError (mkPool TNumber) e -- again, this typeerror's type is morally wrong, but the typechecker should catch this
-fetchBuiltin _ Poolify = VBuiltin $ \n -> return $ VBuiltin $ \d -> poolify n d
+fetchBuiltin _ Poolify = liftValue2 poolify
   where
     poolify :: Value -> Value -> Eval Value
     poolify v@(VNumber _) (VDice d) = do
