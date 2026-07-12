@@ -72,6 +72,9 @@ data Builtin -- unary operators
   | Source
   | Poolify
   | Sum
+  | -- list operations
+    Highest
+  | Lowest
   deriving (Show, Eq, Ord)
 
 data SurfaceExpr

@@ -717,4 +717,32 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   Force an exact `R` or `CR` into an inexact `D` or `CD`.
 ]
 
+#builtin(
+  "highest",
+  "Natural -> [Real] -> [Bool]",
+  "List Operations",
+  examples: [
+    ```hs
+    highest 3 [1, 2, 3, 4, 5] -- [False, False, True, True, True]
+    highest 3 [5, 2, 5, 5, 5] -- [True, False, True, True, False]
+    ```
+  ]
+)[
+  Return a bit mask with the highest $n$ elements set. Ties are broken earliest to latest in the list.
+]
+
+#builtin(
+  "lowest",
+  "Natural -> [Real] -> [Bool]",
+  "List Operations",
+  examples: [
+    ```hs
+    lowest 3 [8, 1, 2, 5, 3] -- [False, True, True, False, True]
+    lowest 3 [1, 8, 1, 1, 1] -- [True, False, True, True, False]
+    ```
+  ]
+)[
+  As #ref-b("highest"), but the bit mask has the lowest $n$ elements set.
+]
+
 // == Standard Library Functions

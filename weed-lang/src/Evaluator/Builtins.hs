@@ -269,3 +269,23 @@ fetchBuiltin _ Poolify = liftValue2 poolify
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertList xs
   VNumber . sum <$> mapM assertNumber xs'
+fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
+  n' <- assertNatural n
+  xs' <- assertList xs
+  let highest :: Ord a => [a] -> [Bool]
+      highest nums = map snd (sortOn fst tagged) where
+        indexed = zip nums [0 :: Integer ..]
+        sortedByVal = sortOn (\(x, i) -> (Down x, i)) indexed
+        (top, rest) = splitAt (fromIntegral n') sortedByVal
+        tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
+  VList . (map VBool) . highest <$> mapM (assertReal Highest) xs'
+fetchBuiltin _ Lowest  = liftValue2 $ \n xs -> do
+  n' <- assertNatural n
+  xs' <- assertList xs
+  let lowest :: Ord a => [a] -> [Bool]
+      lowest nums = map snd (sortOn fst tagged) where
+        indexed = zip nums [0 :: Integer ..]
+        sortedByVal = sort indexed
+        (top, rest) = splitAt (fromIntegral n') sortedByVal
+        tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
+  VList . (map VBool) . lowest <$> mapM (assertReal Lowest) xs'

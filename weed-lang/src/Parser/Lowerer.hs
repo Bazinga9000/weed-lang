@@ -220,7 +220,9 @@ builtinEnv =
     ("collapse", Collapse),
     ("source", Source),
     ("poolify", Poolify),
-    ("sum", Sum)
+    ("sum", Sum),
+    ("highest", Highest),
+    ("lowest", Lowest)
   ]
 
 resolveBuiltins :: SurfaceExpr -> Lower SurfaceExpr

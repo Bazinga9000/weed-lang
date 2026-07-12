@@ -84,6 +84,8 @@ instance Pretty Builtin where
   prettyPrint Source = "source"
   prettyPrint Poolify = "(#)"
   prettyPrint Sum = "sum"
+  prettyPrint Highest = "highest"
+  prettyPrint Lowest = "lowest"
 
 instance Pretty IdentifierName where
   prettyPrint (S s) = show s

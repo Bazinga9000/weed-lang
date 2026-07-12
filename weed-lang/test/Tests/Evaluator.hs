@@ -71,6 +71,15 @@ tPoolNum = TApp TPool tNum
 idX :: IdentifierName
 idX = S "x"
 
+mkHiLoTest :: Builtin -> String -> [Integer] -> [Bool] -> Integer -> TestTree
+mkHiLoTest hiLo name input output n = testCase name $ do
+  let listArgs = CTList tListNum (map cNum input)
+  let expected = VList $ map VBool output
+  let predicateT = tListNum ->> TApp TList TBool
+  let builtinT = TNumber ->> predicateT
+  let expr = (CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs)
+  assertEval expr expected
+
 evaluatorTests :: TestTree
 evaluatorTests =
   testGroup
@@ -139,7 +148,11 @@ evaluatorTests =
             let liftMaskT = (TNumber ->> TBool) ->> predicateT
             let selectorFunc = (CTApply (TFunction TNumber TBool) (CTIdentifier (TFunction TNumber (TFunction TNumber TBool)) (B Eq)) (cNum 1))
             let expr = (CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs)
-            assertEval expr (VList [VBool True, VBool False, VBool False])
+            assertEval expr (VList [VBool True, VBool False, VBool False]),
+          mkHiLoTest Highest "highest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, False, True, False, False, False, True, True, False, False, False, False] 3,
+          mkHiLoTest Lowest "lowest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, True, False, False, True, False, False, False, False, False, True, False] 3,
+          mkHiLoTest Highest "highest is stable" [1, 2, 3, 5, 5, 5, 5, 4] [False, False, False, True, True, True, False, False] 3,
+          mkHiLoTest Lowest "lowest is stable" [5, 4, 3, 1, 1, 1, 1, 2] [False, False, False, True, True, True, False, False] 3
         ],
       testGroup
         "Standard AST Evaluation"
