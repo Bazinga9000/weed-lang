@@ -16,12 +16,13 @@ class Pretty a where
   prettyPrint :: a -> Text
 
 instance Pretty WeedTypeClass where
-  prettyPrint CFunctor = "Functor"
-  prettyPrint CMonad = "Monad"
-  prettyPrint CRollable = "Rollable"
+  prettyPrint (CFunctor t) = "Functor " <> prettyPrint t
+  prettyPrint (CMonad t) = "Monad " <> prettyPrint t
+  prettyPrint (CRollable t) = "Rollable " <> prettyPrint t
+  prettyPrint (CSelector t u) = "Selector " <> prettyPrint t <> " " <> prettyPrint u
 
 instance Pretty TypeConstraint where
-  prettyPrint (CInstanceOf cls tv) = prettyPrint cls <> " " <> prettyPrint tv
+  prettyPrint (CInstanceOf cls) = prettyPrint cls
 
 instance Pretty TypeVarName where
   prettyPrint (TypeVarName n) = "t" <> show n
@@ -154,7 +155,7 @@ instance Pretty TypeError where
   prettyPrint (InfiniteType tv t) = "Infinite type: " <> prettyPrint tv <> " occurs in " <> prettyPrint t
   prettyPrint (CouldNotUnify t1 t2) = "Could not unify " <> prettyPrint t1 <> " and " <> prettyPrint t2
   prettyPrint (AmbiguousTypeVar tv c) = "Ambiguous type variable " <> prettyPrint tv <> " for class " <> prettyPrint c
-  prettyPrint (MissingInstance c t) = "No instance for " <> prettyPrint c <> " for type " <> prettyPrint t
+  prettyPrint (MissingInstance c) = "No instance for " <> prettyPrint c
   prettyPrint (TypeCheckerBug s) = "Type checker bug: " <> s
 
 instance (Pretty l, Pretty r) => Pretty (Either l r) where

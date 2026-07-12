@@ -120,7 +120,7 @@ infer (CUApply f arg) = do
                       then do
                         unify texp taInner
                         (tRes, fmapCall) <- call2 Map tf' cf ta' ca
-                        tell [CInstanceOf CFunctor tWrapper]
+                        tell [CInstanceOf $ CFunctor tWrapper]
                         unify tr tRes
                         return $ Just (tRes, fmapCall)
                       else return Nothing
@@ -135,7 +135,7 @@ infer (CUApply f arg) = do
                         (tReturn, returnCall) <- call1 Return ta' ca
                         unify texp tReturn
                         unify tr tret
-                        tell [CInstanceOf CMonad tWrapper]
+                        tell [CInstanceOf $ CMonad tWrapper]
                         return $ Just (tret, CTApply tret cf returnCall)
                       else return Nothing
                   _ -> return Nothing
@@ -156,7 +156,7 @@ infer (CUApply f arg) = do
                         (tCollapsed, collapseCall) <- call1 Collapse ta' ca
                         (tApplicative, applicativeCall) <- call2 Ap tf' cf tCollapsed collapseCall
                         unify tr tApplicative
-                        tell [CInstanceOf CMonad tWrapper]
+                        tell [CInstanceOf $ CMonad tWrapper]
                         return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing,
@@ -170,7 +170,7 @@ infer (CUApply f arg) = do
                         unify taInner taActual
                         (tApplicative, applicativeCall) <- call2 Ap tf' cf ta' ca
                         unify tr tApplicative
-                        tell [CInstanceOf CMonad tWrapper]
+                        tell [CInstanceOf $ CMonad tWrapper]
                         return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing,
@@ -184,7 +184,7 @@ infer (CUApply f arg) = do
                         (tReturn, returnCall) <- call1 Return ta' ca
                         (tApplicative, applicativeCall) <- call2 Ap tf' cf tReturn returnCall
                         unify tr tApplicative
-                        tell [CInstanceOf CMonad tWrapper]
+                        tell [CInstanceOf $ CMonad tWrapper]
                         return $ Just (tApplicative, applicativeCall)
                       else return Nothing
                   _ -> return Nothing
@@ -321,29 +321,21 @@ solve :: Subst -> [TypeConstraint] -> Either TypeError ()
 solve finalSubst constraints =
   mapM_ solveOne $ apply finalSubst constraints
   where
-    baseType :: WeedType -> WeedType
-    baseType (TApp t _) = baseType t
-    baseType t = t
-
-    solveOne :: TypeConstraint -> Either TypeError ()
-    solveOne (CInstanceOf cls t) =
-      let base = baseType t
-       in case (cls, base) of
-            -- Functor
-            (CFunctor, TList) -> Right ()
-            (CFunctor, TDice) -> Right ()
-            (CFunctor, TPool) -> Right ()
-            -- Monad
-            (CMonad, TList) -> Right ()
-            (CMonad, TDice) -> Right ()
-            (CMonad, TPool) -> Right ()
-            -- Rollable
-            (CRollable, TDice) -> Right ()
-            (CRollable, TPool) -> Right ()
-            -- Ambiguous top-level type variable
-            (c, TVar tv) -> Left $ AmbiguousTypeVar tv c
-            -- Missing instance
-            (c, t') -> Left $ MissingInstance c t'
+    solveOne (CInstanceOf cls) =
+      let baseTypeOneOf :: WeedType -> [WeedType] -> Either TypeError ()
+          baseTypeOneOf t ts = case baseType t of
+            (TVar tv) -> Left $ AmbiguousTypeVar tv cls
+            bt -> if bt `elem` ts then Right () else Left $ MissingInstance cls
+       in case cls of
+            (CFunctor t) -> baseTypeOneOf t [TList, TDice, TPool]
+            (CMonad t) -> baseTypeOneOf t [TList, TDice, TPool]
+            (CRollable t) -> baseTypeOneOf t [TDice, TPool]
+            (CSelector s a) ->
+              case s of
+                TFunction a' TBool | a == a' -> Right ()
+                TFunction (TApp TList a') (TApp TList TBool) | a == a' -> Right ()
+                TVar tv -> Left $ AmbiguousTypeVar tv cls
+                _ -> Left $ MissingInstance cls
 
 typeCheck :: CoreUntypedExpr -> Either TypeError CoreTypedExpr
 typeCheck expr = do

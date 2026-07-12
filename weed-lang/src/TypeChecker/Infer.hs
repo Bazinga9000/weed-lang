@@ -128,8 +128,8 @@ generalize t localConstraints = do
   let genSet = Set.fromList genVars
 
   -- filter for constraints that exclusively mention quantified variables
-  let canScoop (CInstanceOf _ ty) =
-        let cFtv = ftv ty
+  let canScoop (CInstanceOf c) =
+        let cFtv = ftv c
          in not (Set.null cFtv) && cFtv `Set.isSubsetOf` genSet
 
   -- partition the constraints

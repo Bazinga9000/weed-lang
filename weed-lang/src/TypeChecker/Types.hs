@@ -5,20 +5,21 @@ data TypeError
   | InfiniteType TypeVarName WeedType
   | CouldNotUnify WeedType WeedType
   | AmbiguousTypeVar TypeVarName WeedTypeClass
-  | MissingInstance WeedTypeClass WeedType
+  | MissingInstance WeedTypeClass
   | TypeCheckerBug Text
   deriving (Show, Eq)
 
--- functor: implemented by [], Dice, Pool
--- monad: implemented by Dice, Pool
--- rollable: implemented by Dice, Pool
-data WeedTypeClass = CFunctor | CMonad | CRollable deriving (Show, Eq)
+-- functor t: implemented by [], Dice, Pool
+-- monad t: implemented by [], Dice, Pool
+-- rollable t: implemented by Dice, Pool
+-- selector s a: implemented when s = a -> Bool or s = [a] -> [Bool]
+data WeedTypeClass = CFunctor WeedType | CMonad WeedType | CRollable WeedType | CSelector WeedType WeedType deriving (Show, Eq)
 
 newtype TypeVarName = TypeVarName Int deriving (Show, Eq, Ord)
 
 -- we only collect typeclass constraints. equality is eagerly unified.
 -- haskell also does this, for instance
-data TypeConstraint = CInstanceOf WeedTypeClass WeedType
+data TypeConstraint = CInstanceOf WeedTypeClass
   deriving (Show)
 
 data WeedType
@@ -32,6 +33,10 @@ data WeedType
   | TVar TypeVarName -- a type variable
   | TApp WeedType WeedType -- a b
   deriving (Show, Eq, Ord)
+
+baseType :: WeedType -> WeedType
+baseType (TApp t _) = baseType t
+baseType t = t
 
 -- helpers for type construction
 infixr 0 ->>

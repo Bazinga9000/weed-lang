@@ -17,10 +17,21 @@ class Substitutable a where
   apply :: Subst -> a -> a
   ftv :: a -> Set.Set TypeVarName
 
-instance Substitutable TypeConstraint where
-  apply s (CInstanceOf c t) = CInstanceOf c (apply s t)
+instance Substitutable WeedTypeClass where
+  apply s (CFunctor t) = CFunctor (apply s t)
+  apply s (CMonad t) = CMonad (apply s t)
+  apply s (CRollable t) = CRollable (apply s t)
+  apply s (CSelector t u) = CSelector (apply s t) (apply s u)
 
-  ftv (CInstanceOf _ t) = ftv t
+  ftv (CFunctor t) = ftv t
+  ftv (CMonad t) = ftv t
+  ftv (CRollable t) = ftv t
+  ftv (CSelector t u) = ftv t `Set.union` ftv u
+
+instance Substitutable TypeConstraint where
+  apply s (CInstanceOf c) = CInstanceOf (apply s c)
+
+  ftv (CInstanceOf c) = ftv c
 
 instance Substitutable WeedType where
   apply _ TNumber = TNumber
