@@ -130,5 +130,6 @@ builtinType Poolify = do
   tv <- fresh
   return $ ForAll [tv] [] (TNumber ->> mkDice (TVar tv) ->> mkPool (TVar tv))
 builtinType Sum = return $ noPoly (mkList TNumber ->> TNumber)
+builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
 builtinType Highest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)
 builtinType Lowest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)

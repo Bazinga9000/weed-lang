@@ -12,6 +12,8 @@ import Evaluator.WeedNumber
 import Formatting.Pretty (prettyPrint)
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
+import Control.Lens ((%~))
+import TowerNumber.Core (approximate)
 
 --
 -- Helper functions to lift functions into builtins that automatically lift/collapse into dice expressions.
@@ -269,6 +271,7 @@ fetchBuiltin _ Poolify = liftValue2 poolify
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertList xs
   VNumber . sum <$> mapM assertNumber xs'
+fetchBuiltin _ Approximate = liftNumber (value %~ approximate)
 fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n
   xs' <- assertList xs

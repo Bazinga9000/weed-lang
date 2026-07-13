@@ -72,6 +72,7 @@ data Builtin -- unary operators
   | Source
   | Poolify
   | Sum
+  | Approximate
   | -- list operations
     Highest
   | Lowest
