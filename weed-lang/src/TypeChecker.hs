@@ -326,6 +326,12 @@ solve finalSubst constraints =
           baseTypeOneOf t ts = case baseType t of
             (TVar tv) -> Left $ AmbiguousTypeVar tv cls
             bt -> if bt `elem` ts then Right () else Left $ MissingInstance cls
+
+          isNestedListOf :: WeedType -> [WeedType] -> Either TypeError ()
+          isNestedListOf (TApp TList t) ts = isNestedListOf t ts
+          isNestedListOf (TApp _ _) _ = Left $ MissingInstance cls
+          isNestedListOf t ts = if t `elem` ts then Right () else Left $ MissingInstance cls
+
        in case cls of
             (CFunctor t) -> baseTypeOneOf t [TList, TDice, TPool]
             (CMonad t) -> baseTypeOneOf t [TList, TDice, TPool]
@@ -336,6 +342,8 @@ solve finalSubst constraints =
                 TFunction (TApp TList a') (TApp TList TBool) | a == a' -> Right ()
                 TVar tv -> Left $ AmbiguousTypeVar tv cls
                 _ -> Left $ MissingInstance cls
+            (CEq t) -> isNestedListOf t [TNumber, TBool, TUnit]
+            (COrd t) -> isNestedListOf t [TNumber, TBool, TUnit]
 
 typeCheck :: CoreUntypedExpr -> Either TypeError CoreTypedExpr
 typeCheck expr = do

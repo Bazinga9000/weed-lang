@@ -31,13 +31,15 @@ dice1 = return $ noPoly (TNumber ->> mkDice TNumber)
 dice2 :: Infer WeedTypeScheme
 dice2 = return $ noPoly (TNumber ->> TNumber ->> mkDice TNumber)
 
-cmpNum :: Infer WeedTypeScheme
-cmpNum = return $ noPoly (TNumber ->> TNumber ->> TBool)
-
-cmpAny :: Infer WeedTypeScheme
-cmpAny = do
+eqCmp :: Infer WeedTypeScheme
+eqCmp = do
   tv <- fresh
-  return $ ForAll [tv] [] (TVar tv ->> TVar tv ->> TBool)
+  return $ ForAll [tv] [CInstanceOf $ CEq (TVar tv)] (TVar tv ->> TVar tv ->> TBool)
+
+ordCmp :: Infer WeedTypeScheme
+ordCmp = do
+  tv <- fresh
+  return $ ForAll [tv] [CInstanceOf $ COrd (TVar tv)] (TVar tv ->> TVar tv ->> TBool)
 
 builtinType :: Builtin -> Infer WeedTypeScheme
 builtinType Negate = num1
@@ -52,12 +54,12 @@ builtinType ComplexSub = num2
 builtinType Floor = num1
 builtinType Ceil = num1
 builtinType Pow = num2
-builtinType Eq = cmpAny
-builtinType Neq = cmpAny
-builtinType Le = cmpNum
-builtinType Lt = cmpNum
-builtinType Ge = cmpNum
-builtinType Gt = cmpNum
+builtinType Eq = eqCmp
+builtinType Neq = eqCmp
+builtinType Le = ordCmp
+builtinType Lt = ordCmp
+builtinType Ge = ordCmp
+builtinType Gt = ordCmp
 builtinType And = bool2
 builtinType Or = bool2
 builtinType Xor = bool2

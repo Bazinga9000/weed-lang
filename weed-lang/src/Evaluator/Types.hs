@@ -16,7 +16,6 @@ lookupIdent env name = Map.lookup name env
 
 data EvaluationError
   = DivisionByZero
-  | BadComparisonType Text
   | DomainError Builtin
   | TypeError WeedType Value
   | BadDieParameter Builtin Text Value

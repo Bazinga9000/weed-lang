@@ -1,6 +1,6 @@
 module TowerNumber.Core
   ( TowerNumber (..),
-    liftCompare,
+    maybeCompare,
     approximate,
     tnFloor,
     tnCeil,

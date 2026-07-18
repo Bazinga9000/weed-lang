@@ -91,12 +91,12 @@ lift2 rf df x y = downcast $ case (upcast x, upcast y) of
   (_, N) -> N
   _ -> error "unreachable"
 
-liftCompare :: (Rational -> Rational -> Ordering) -> (Double -> Double -> Ordering) -> TowerNumber -> TowerNumber -> Maybe Ordering
-liftCompare rc _ (R x) (R y) = Just $ rc x y
-liftCompare _ dc (R x) (D y) = Just $ dc (fromRational x) y
-liftCompare _ dc (D x) (R y) = Just $ dc x (fromRational y)
-liftCompare _ dc (D x) (D y) = Just $ dc x y
-liftCompare _ _ _ _ = Nothing
+maybeCompare :: TowerNumber -> TowerNumber -> Maybe Ordering
+maybeCompare (R x) (R y) = Just $ compare x y
+maybeCompare (R x) (D y) = Just $ compare (fromRational x) y
+maybeCompare (D x) (R y) = Just $ compare x (fromRational y)
+maybeCompare (D x) (D y) = Just $ compare x y
+maybeCompare _ _ = Nothing
 
 -- transcendetal functions will always work on doubles (but still try to downcast after)
 unsafeUpcast :: TowerNumber -> Complex Double

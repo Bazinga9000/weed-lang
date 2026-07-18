@@ -88,6 +88,9 @@ infix 4 =~=
 (=~=) :: WeedNumber -> WeedNumber -> Bool
 (=~=) a b = a ^. value == b ^. value
 
+wnMaybeCompare :: WeedNumber -> WeedNumber -> Maybe Ordering
+wnMaybeCompare a b = maybeCompare (a ^. value) (b ^. value)
+
 --- metadata related functions
 
 wnLiftMeta :: (NumberMetadata -> NumberMetadata) -> WeedNumber -> WeedNumber

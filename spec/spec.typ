@@ -175,6 +175,32 @@ Selector a (a -> Bool)
 Selector a ([a] -> [Bool])
 ```]
 
+=== `Eq`
+
+Eq is the typeclass allowing tests of equality. It provides #ref-b("(==)") and #ref-b("(/=)").
+
+Eq has the following instances:
+#box[```hs
+Eq Number
+Eq Bool
+Eq Unit
+Eq a => Eq [a]
+```]
+
+=== `Ord`
+
+Ord is the typeclass allowing tests of comparison. It provides #ref-b("(>)"), #ref-b("(>=)"), #ref-b("(<)"), and #ref-b("(<=)"). All `Ord` instances must be `Eq`.
+
+Ord has the following instances:
+#box[```hs
+Ord Number
+Ord Bool
+Ord Unit
+Ord a => Ord [a]
+```]
+
+Note: The `Ord` instance for `Number` will fail at runtime when either input has nonzero imaginary part.
+
 #label("Number Semantics")
 = Number Semantics
 
@@ -581,6 +607,73 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   fixity: "infixr 5",
 )[
   Repeatedly rolls a die a number of times and assembles them into a `Pool`.
+]
+
+#builtin(
+  "(==)",
+  "Eq a => a -> a -> Bool",
+  "Comparison",
+  fixity: "infix 4"
+)[
+  Compares two values for equality.
+]
+
+
+#builtin(
+  "(/=)",
+  "Eq a => a -> a -> Bool",
+  "Comparison",
+  fixity: "infix 4"
+)[
+  Compares two values for inequality.
+]
+
+#builtin(
+  "(>)",
+  "Ord a => a -> a -> Bool",
+  "Comparison",
+  fixity: "infix 4"
+)[
+  Checkes whether the first argument is strictly greater than the second. Follows Haskell conventions for ordering.
+
+  Will fail at runtime if either argument is a number with nonzero imaginary part.
+]
+
+
+#builtin(
+  "(<)",
+  "Ord a => a -> a -> Bool",
+  "Comparison",
+  fixity: "infix 4"
+)[
+  Checkes whether the first argument is strictly less than the second. Follows Haskell conventions for ordering.
+
+  Will fail at runtime if either argument is a number with nonzero imaginary part.
+]
+
+
+#builtin(
+  "(>=)",
+  "Ord a => a -> a -> Bool",
+  "Comparison",
+  fixity: "infix 4"
+)[
+  Checkes whether the first argument is greater than or equal to the second. Follows Haskell conventions for ordering.
+
+  Will fail at runtime if either argument is a number with nonzero imaginary part.
+]
+
+
+
+#builtin(
+  "(<=)",
+  "Ord a => a -> a -> Bool",
+  "Comparison",
+  fixity: "infix 4"
+)[
+  Checkes whether the first argument is less than or equal to the second. Follows Haskell conventions for ordering.
+
+  Will fail at runtime if either argument is a number with nonzero imaginary part.
 ]
 
 #builtin(

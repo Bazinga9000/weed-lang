@@ -20,6 +20,8 @@ instance Pretty WeedTypeClass where
   prettyPrint (CMonad t) = "Monad " <> prettyPrint t
   prettyPrint (CRollable t) = "Rollable " <> prettyPrint t
   prettyPrint (CSelector t u) = "Selector " <> prettyPrint t <> " " <> prettyPrint u
+  prettyPrint (CEq t) = "Eq " <> prettyPrint t
+  prettyPrint (COrd t) = "Ord " <> prettyPrint t
 
 instance Pretty TypeConstraint where
   prettyPrint (CInstanceOf cls) = prettyPrint cls
@@ -147,7 +149,6 @@ instance Pretty Value where
 
 instance Pretty EvaluationError where
   prettyPrint DivisionByZero = "Division by zero"
-  prettyPrint (BadComparisonType t) = "Bad comparison type: " <> show t
   prettyPrint (DomainError b) = "Domain error: Builtin " <> prettyPrint b <> " expected real, got complex"
   prettyPrint (TypeError t v) = "Type error: Expected " <> prettyPrint t <> ", got " <> prettyPrint v
   prettyPrint (BadDieParameter b s v) = "Bad die parameter: " <> prettyPrint b <> " " <> s <> " , got " <> prettyPrint v

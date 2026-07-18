@@ -22,11 +22,15 @@ instance Substitutable WeedTypeClass where
   apply s (CMonad t) = CMonad (apply s t)
   apply s (CRollable t) = CRollable (apply s t)
   apply s (CSelector t u) = CSelector (apply s t) (apply s u)
+  apply s (CEq t) = CEq (apply s t)
+  apply s (COrd t) = COrd (apply s t)
 
   ftv (CFunctor t) = ftv t
   ftv (CMonad t) = ftv t
   ftv (CRollable t) = ftv t
   ftv (CSelector t u) = ftv t `Set.union` ftv u
+  ftv (CEq t) = ftv t
+  ftv (COrd t) = ftv t
 
 instance Substitutable TypeConstraint where
   apply s (CInstanceOf c) = CInstanceOf (apply s c)

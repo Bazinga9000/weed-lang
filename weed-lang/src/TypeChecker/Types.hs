@@ -13,7 +13,12 @@ data TypeError
 -- monad t: implemented by [], Dice, Pool
 -- rollable t: implemented by Dice, Pool
 -- selector s a: implemented when s = a -> Bool or s = [a] -> [Bool]
-data WeedTypeClass = CFunctor WeedType | CMonad WeedType | CRollable WeedType | CSelector WeedType WeedType deriving (Show, Eq)
+data WeedTypeClass = CFunctor WeedType
+                   | CMonad WeedType
+                   | CRollable WeedType
+                   | CSelector WeedType WeedType
+                   | CEq WeedType
+                   | COrd WeedType deriving (Show, Eq)
 
 newtype TypeVarName = TypeVarName Int deriving (Show, Eq, Ord)
 

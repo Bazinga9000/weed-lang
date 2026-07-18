@@ -35,7 +35,7 @@ liftBool f = VBuiltin liftBool'
     liftBool' e = throwError $ TypeError TBool e
 
 liftNumber2 :: (WeedNumber -> WeedNumber -> WeedNumber) -> Value
-liftNumber2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftNumber2' a b
+liftNumber2 f = liftValue2 liftNumber2'
   where
     liftNumber2' :: Value -> Value -> Eval Value
     liftNumber2' (VNumber n) (VNumber n') = return $ VNumber (f n n')
@@ -43,7 +43,7 @@ liftNumber2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftNumber2' a b
     liftNumber2' e _ = throwError $ TypeError TNumber e
 
 liftBool2 :: (Bool -> Bool -> Bool) -> Value
-liftBool2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftBool2' a b
+liftBool2 f = liftValue2 liftBool2'
   where
     liftBool2' :: Value -> Value -> Eval Value
     liftBool2' (VBool b) (VBool b') = return $ VBool (f b b')
@@ -53,12 +53,6 @@ liftBool2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> liftBool2' a b
 liftValue2 :: (Value -> Value -> Eval Value) -> Value
 liftValue2 f = VBuiltin $ \a -> return $ VBuiltin $ \b -> f a b
 
-liftRealCmp :: Builtin -> (Double -> Double -> Bool) -> Value
-liftRealCmp ident f = VBuiltin $ \a -> return $ VBuiltin $ \b -> do
-  a' <- assertReal ident a
-  b' <- assertReal ident b
-  return $ VBool (f a' b')
-
 ---
 -- Mathematical helpers
 ---
@@ -67,16 +61,40 @@ equality :: Value -> Value -> Eval Value
 equality (VNumber a) (VNumber b) = return $ VBool (a =~= b)
 equality (VBool a) (VBool b) = return $ VBool (a == b)
 equality VUnit VUnit = return $ VBool True
-equality (VClosure {}) (VClosure {}) = throwError $ BadComparisonType "function"
-equality (VBuiltin _) (VBuiltin _) = throwError $ BadComparisonType "function"
+equality (VClosure {}) (VClosure {}) = throwError $ InterpreterBug "equality check got function"
+equality (VBuiltin _) (VBuiltin _) = throwError $ InterpreterBug "equality check got function"
 equality (VList a) (VList b)
   | length a /= length b = return $ VBool False
   | otherwise = do
       eqs <- zipWithM equality a b >>= mapM assertBool
       return $ VBool (and eqs)
-equality (VDice _) (VDice _) = throwError $ BadComparisonType "dice"
-equality (VPool _ _) (VPool _ _) = throwError $ BadComparisonType "pool"
+equality (VDice _) (VDice _) = throwError $ InterpreterBug "equality check got dice"
+equality (VPool _ _) (VPool _ _) = throwError $ InterpreterBug "equality check got pool"
 equality _ _ = throwError $ InterpreterBug "Mistyped comparison"
+
+comparison :: Builtin -> Value -> Value -> Eval Ordering
+comparison blt (VNumber a) (VNumber b) = maybe (throwError $ DomainError blt) return (wnMaybeCompare a b)
+comparison _ (VBool a) (VBool b) = return $ compare a b
+comparison _ VUnit VUnit = return EQ
+comparison _ (VClosure {}) (VClosure {}) = throwError $ InterpreterBug "comparison got function"
+comparison _ (VBuiltin _) (VBuiltin _) = throwError $ InterpreterBug "comparison got function"
+comparison blt (VList l1) (VList l2) = compareLists l1 l2 where
+  compareLists [] [] = return EQ
+  compareLists _ [] = return GT
+  compareLists [] _ = return LT
+  compareLists (a:as) (b:bs) = do
+    o <- comparison blt a b
+    case o of
+      LT -> return LT
+      GT -> return GT
+      EQ -> compareLists as bs
+comparison _ (VDice _) (VDice _) = throwError $ InterpreterBug "comparison got dice"
+comparison _ (VPool _ _) (VPool _ _) = throwError $ InterpreterBug "comparison got pool"
+comparison _ _ _ = throwError $ InterpreterBug "mistyped comparison"
+
+liftComparison :: Builtin -> (Ordering -> Bool) -> Value
+liftComparison blt f = liftValue2 $ \a b -> (VBool . f) <$> (comparison blt a b)
+
 
 getExactInteger :: Double -> Maybe Int
 getExactInteger x
@@ -112,11 +130,11 @@ fetchBuiltin _ Floor = liftNumber wnFloor
 fetchBuiltin _ Ceil = liftNumber wnCeil
 fetchBuiltin _ Eq = liftValue2 equality
 fetchBuiltin _ Neq =
-  liftValue2 $ \a b -> VBool . not <$> (equality a b >>= assertBool)
-fetchBuiltin _ Le = liftRealCmp Le (<=)
-fetchBuiltin _ Lt = liftRealCmp Lt (<)
-fetchBuiltin _ Ge = liftRealCmp Ge (>=)
-fetchBuiltin _ Gt = liftRealCmp Gt (>)
+  liftValue2 $ \a b -> VBool . not <$> (equality a b >>= assertBool) -- todo: this is kinda stupid, its an assertBool that is guaranteed to pass
+fetchBuiltin _ Le = liftComparison Le (/= GT)
+fetchBuiltin _ Lt = liftComparison Lt (== LT)
+fetchBuiltin _ Ge = liftComparison Ge (/= LT)
+fetchBuiltin _ Gt = liftComparison Gt (== GT)
 fetchBuiltin _ And = liftBool2 (&&)
 fetchBuiltin _ Or = liftBool2 (||)
 fetchBuiltin _ Xor = liftBool2 (/=)
