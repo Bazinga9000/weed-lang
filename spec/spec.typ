@@ -131,6 +131,13 @@ The following types have kind `* -> *` and represent structured data:
 
 Types implementing `Functor` can be mapped over. The set of required functions is only #ref-b("map").
 
+`Functor` has the following instances:
+#box[```hs
+Functor []
+Functor Dice
+Functor Pool
+```]
+
 === `Monad`
 
 Types implementing `Monad` support sequential effectful computation. This spec is not the place for a detailed intuitive explanation on Monads, so the previous sentence and the statement that the two required functions are #ref-b("return") and #ref-b("bind") will have to suffice.
@@ -139,26 +146,34 @@ All instances of `Monad` are required to be instances of `Functor`.
 
 _(Note for Haskellers: `Monad`s also implement #ref-b("ap"), which is technically a member of `Applicative`, but since #weed has no non-Applicative Monads, #ref-b("ap") is implemented in terms of Monad as well. If it becomes necessary to enrich the type system further, this might change.)_
 
+`Monad` has the following instances:
+#box[```hs
+Monad []
+Monad Dice
+Monad Pool
+```]
+
 === `Rollable`
 
 Instances of `Rollable` represent dice computations from which a canonical generator can be derived. The only required function on `Rollable` is #ref-b("source").
 
 *Note*: For primitives and simple Pools, the `source` will be a die from which all dice in the Pool are copies of, but after arbitrary transformation this is not always the case. In general, the canonical generator for a Pool represents a "representative distribution" of all dice in the Pool.
 
+Rollable has the following instances:
+#box[```hs
+Rollable Dice
+Rollable Pool
+```]
+
 === `Selector`
 
-Selector is a mulitparameter typeclass that represents predicates on type `a`, be they local (depend on only the target value, like `(`#ref-b("(==)", alias: "==")` 5)`) or global (depend an entire list context, like `(`#ref-b("highest")` 4)`). `Selector a` is implemented by `a -> Bool` and `[a] -> [Bool]` and provides #ref-b("liftMask") to access the most general form of the predicate (`[a] -> [Bool]`)
+Selector is a mulitparameter typeclass that represents predicates on type `a`, be they local (depend on only the target value, like `(`#ref-b("(==)", alias: "==")` 5)`) or global (depend an entire list context, like `(`#ref-b("highest")` 4)`). `Selector a` provides #ref-b("liftMask") to access the most general form of the predicate (of type `[a] -> [Bool]`)
 
-=== Table of Typeclass Implementations
-
-#table(
-  columns: (auto, auto, auto, auto),
-  align: center,
-  [Type], [`Functor`], [`Monad`], [`Rollable`],
-  [`[]`], [#yesmark], [#yesmark], [#nomark],
-  [`Dice`], [#yesmark], [#yesmark], [#yesmark],
-  [`Pool`], [#yesmark], [#yesmark], [#yesmark],
-)
+`Selector` has the following implementations:
+#box[```hs
+Selector a (a -> Bool)
+Selector a ([a] -> [Bool])
+```]
 
 #label("Number Semantics")
 = Number Semantics
