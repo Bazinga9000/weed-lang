@@ -104,7 +104,7 @@ builtinType LiftMask = do
   a <- fresh
   let ts = TVar s
   let ta = TVar a
-  return $ ForAll [s, a] [CInstanceOf $ CSelector ts ta] (ts ->> TApp TList ta ->> TApp TList TBool)
+  return $ ForAll [s, a] [CInstanceOf $ CSelector ta ts] (ts ->> TApp TList ta ->> TApp TList TBool)
 builtinType DiceD = dice1
 builtinType DiceS = do
   tv <- fresh

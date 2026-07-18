@@ -653,7 +653,7 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 
 #builtin(
   "liftMask",
-  "Selector s a => s -> [a] -> [Bool]",
+  "Selector a s => s -> [a] -> [Bool]",
   "Filtering",
   examples: [
     ```hs

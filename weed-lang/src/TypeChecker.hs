@@ -330,7 +330,7 @@ solve finalSubst constraints =
             (CFunctor t) -> baseTypeOneOf t [TList, TDice, TPool]
             (CMonad t) -> baseTypeOneOf t [TList, TDice, TPool]
             (CRollable t) -> baseTypeOneOf t [TDice, TPool]
-            (CSelector s a) ->
+            (CSelector a s) ->
               case s of
                 TFunction a' TBool | a == a' -> Right ()
                 TFunction (TApp TList a') (TApp TList TBool) | a == a' -> Right ()
