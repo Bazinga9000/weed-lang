@@ -93,7 +93,7 @@ comparison _ (VPool _ _) (VPool _ _) = throwError $ InterpreterBug "comparison g
 comparison _ _ _ = throwError $ InterpreterBug "mistyped comparison"
 
 liftComparison :: Builtin -> (Ordering -> Bool) -> Value
-liftComparison blt f = liftValue2 $ \a b -> (VBool . f) <$> (comparison blt a b)
+liftComparison blt f = liftValue2 $ \a b -> VBool . f <$> comparison blt a b
 
 
 getExactInteger :: Double -> Maybe Int
@@ -237,15 +237,15 @@ fetchBuiltin _ Bind = liftValue2 $ \m f -> do
     _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> prettyPrint m <> ">>=" <> prettyPrint f <> ")"
 fetchBuiltin t LiftMask =
   let unwrapFunction :: WeedType -> [WeedType]
-      unwrapFunction (TFunction a b) = a : (unwrapFunction b)
+      unwrapFunction (TFunction a b) = a : unwrapFunction b
       unwrapFunction ty = [ty]
 
       getLiftMaskType :: WeedType -> Either EvaluationError Bool
       getLiftMaskType ty = case unwrapFunction ty of
-        [(TFunction (TApp TList _) (TApp TList TBool)), (TApp TList _), (TApp TList TBool)] -> return True
-        [(TFunction _ TBool), (TApp TList _), (TApp TList TBool)] -> return False
+        [TFunction (TApp TList _) (TApp TList TBool), TApp TList _, TApp TList TBool] -> return True
+        [TFunction _ TBool, TApp TList _, TApp TList TBool] -> return False
         e -> throwError $ InterpreterBug $ "LiftMask input type was " <> prettyPrint ty <> " unwrapped as " <> prettyPrint e
-   in case (getLiftMaskType t) of
+   in case getLiftMaskType t of
         -- Just True: input is ([a] -> [Bool]), Just False: input is a -> Bool
         Right True -> liftValue2 applyValue
         Right False -> liftValue2 $ \f a -> do
@@ -294,19 +294,19 @@ fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n
   xs' <- assertList xs
   let highest :: Ord a => [a] -> [Bool]
-      highest nums = map snd (sortOn fst tagged) where
+      highest nums = map snd (sortWith fst tagged) where
         indexed = zip nums [0 :: Integer ..]
-        sortedByVal = sortOn (\(x, i) -> (Down x, i)) indexed
+        sortedByVal = sortOn (first Down) indexed
         (top, rest) = splitAt (fromIntegral n') sortedByVal
         tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
-  VList . (map VBool) . highest <$> mapM (assertReal Highest) xs'
+  VList . map VBool . highest <$> mapM (assertReal Highest) xs'
 fetchBuiltin _ Lowest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n
   xs' <- assertList xs
   let lowest :: Ord a => [a] -> [Bool]
-      lowest nums = map snd (sortOn fst tagged) where
+      lowest nums = map snd (sortWith fst tagged) where
         indexed = zip nums [0 :: Integer ..]
         sortedByVal = sort indexed
         (top, rest) = splitAt (fromIntegral n') sortedByVal
         tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
-  VList . (map VBool) . lowest <$> mapM (assertReal Lowest) xs'
+  VList . map VBool . lowest <$> mapM (assertReal Lowest) xs'

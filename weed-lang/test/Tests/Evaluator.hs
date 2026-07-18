@@ -77,7 +77,7 @@ mkHiLoTest hiLo name input output n = testCase name $ do
   let expected = VList $ map VBool output
   let predicateT = tListNum ->> TApp TList TBool
   let builtinT = TNumber ->> predicateT
-  let expr = (CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs)
+  let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs
   assertEval expr expected
 
 evaluatorTests :: TestTree
@@ -146,8 +146,8 @@ evaluatorTests =
             let listArgs = CTList tListNum [cNum 1, cNum 2, cNum 3]
             let predicateT = tListNum ->> TApp TList TBool
             let liftMaskT = (TNumber ->> TBool) ->> predicateT
-            let selectorFunc = (CTApply (TFunction TNumber TBool) (CTIdentifier (TFunction TNumber (TFunction TNumber TBool)) (B Eq)) (cNum 1))
-            let expr = (CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs)
+            let selectorFunc = CTApply (TFunction TNumber TBool) (CTIdentifier (TFunction TNumber (TFunction TNumber TBool)) (B Eq)) (cNum 1)
+            let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs
             assertEval expr (VList [VBool True, VBool False, VBool False]),
           mkHiLoTest Highest "highest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, False, True, False, False, False, True, True, False, False, False, False] 3,
           mkHiLoTest Lowest "lowest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, True, False, False, True, False, False, False, False, False, True, False] 3,

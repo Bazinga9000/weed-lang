@@ -24,7 +24,7 @@ newtype TypeVarName = TypeVarName Int deriving (Show, Eq, Ord)
 
 -- we only collect typeclass constraints. equality is eagerly unified.
 -- haskell also does this, for instance
-data TypeConstraint = CInstanceOf WeedTypeClass
+newtype TypeConstraint = CInstanceOf WeedTypeClass
   deriving (Show)
 
 data WeedType

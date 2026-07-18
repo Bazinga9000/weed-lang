@@ -99,11 +99,6 @@ eval (CTIf _ cond t f) = do
           mapM runCond vs
     _ -> throwError $ InterpreterBug "Evaluator got a non-boolean condition"
 
--- eval (CTMap _ f v) = do
--- eval (CTAp t mf ma) = do
--- eval (CTReturn t v) = do
--- eval (CTBind _ monadArg fnArg) = do
-
 evalPreSample :: CoreTypedExpr -> Either EvaluationError Value
 evalPreSample expr = runEval Map.empty $ eval expr
 
