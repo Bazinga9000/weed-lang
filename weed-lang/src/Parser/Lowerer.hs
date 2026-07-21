@@ -222,6 +222,7 @@ builtinEnv =
     ("poolify", Poolify),
     ("sum", Sum),
     ("keep", Keep),
+    ("drop", Drop),
     ("approximate", Approximate),
     ("highest", Highest),
     ("lowest", Lowest)

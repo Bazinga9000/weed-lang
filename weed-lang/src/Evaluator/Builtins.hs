@@ -344,6 +344,7 @@ fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertList xs
   VNumber . sum <$> mapM assertNumber xs'
 fetchBuiltin t Keep = mkPredicateMapModifier Keep (const return) (const $ return . markDropped) t
+fetchBuiltin t Drop = mkPredicateMapModifier Keep (const $ return . markDropped) (const return) t
 fetchBuiltin _ Approximate = liftNumber (value %~ approximate)
 fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n

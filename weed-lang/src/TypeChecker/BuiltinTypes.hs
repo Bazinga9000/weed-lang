@@ -41,6 +41,16 @@ ordCmp = do
   tv <- fresh
   return $ ForAll [tv] [CInstanceOf $ COrd (TVar tv)] (TVar tv ->> TVar tv ->> TBool)
 
+predicateMapModifier :: Infer WeedTypeScheme
+predicateMapModifier = do
+  s <- fresh
+  a <- fresh
+  r <- fresh
+  let ts = TVar s
+      ta = TVar a
+      tr = TVar r
+  return $ ForAll [s, a, r] [CInstanceOf $ CRollable tr, CInstanceOf $ CSelector ta ts] (ts ->> TApp tr ta ->> TApp tr ta)
+
 builtinType :: Builtin -> Infer WeedTypeScheme
 builtinType Negate = num1
 builtinType Not = bool1
@@ -132,14 +142,8 @@ builtinType Poolify = do
   tv <- fresh
   return $ ForAll [tv] [] (TNumber ->> mkDice (TVar tv) ->> mkPool (TVar tv))
 builtinType Sum = return $ noPoly (mkList TNumber ->> TNumber)
-builtinType Keep = do
-  s <- fresh
-  a <- fresh
-  r <- fresh
-  let ts = TVar s
-      ta = TVar a
-      tr = TVar r
-  return $ ForAll [s, a, r] [CInstanceOf $ CRollable tr, CInstanceOf $ CSelector ta ts] (ts ->> TApp tr ta ->> TApp tr ta)
+builtinType Keep = predicateMapModifier
+builtinType Drop = predicateMapModifier
 builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
 builtinType Highest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)
 builtinType Lowest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)

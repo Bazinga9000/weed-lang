@@ -798,6 +798,15 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   Mark all results of a roll that do _not_ satisfy the `Selector` as Dropped.
 ]
 
+
+#builtin(
+  "drop",
+  "Rollable r, Selector a s => s -> r a -> r a",
+  "Dice Modifiers"
+)[
+  Mark all results of a roll that _do_ satisfy the `Selector` as Dropped.
+]
+
 #builtin(
   "explode",
   "Rollable r, Selector a s => s -> r a -> Pool a",

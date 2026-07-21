@@ -73,6 +73,7 @@ data Builtin -- unary operators
   | Poolify
   | Sum
   | Keep
+  | Drop
   | Approximate
   | -- list operations
     Highest
