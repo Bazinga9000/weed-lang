@@ -124,6 +124,53 @@ unwrapFunction :: WeedType -> NonEmpty WeedType
 unwrapFunction (TFunction a b) = a N.<| unwrapFunction b
 unwrapFunction t = one t
 
+---
+--- Dice Helpers
+---
+
+markDropped :: Value -> Value
+markDropped v = case v of
+     VNumber n -> VNumber $ ((metadata . _Just . dropped) .~ True) n
+     o' -> o' -- TODO: non-numbers don't have metadata (perhaps they should?)
+
+--- Construct the builtin for a modifier like keep.
+-- Takes in
+-- (1) the name of the builtin
+-- (2) two functions (with access to the canonical generator)
+-- (2a) what to do if the predicate holds
+-- (2b) what to do if the predicate does NOT hold
+-- (3) the type assigned to the builtin
+-- and generates the builtin which checks each roll against the predicate, and mutates it according to the function
+mkPredicateMapModifier :: Builtin -> (Roll Value -> Value -> Roll Value) -> (Roll Value -> Value -> Roll Value) -> WeedType -> Value
+mkPredicateMapModifier blt trueFn falseFn t = liftValue2 $ \predicate d -> do
+  let selectorType = head $ unwrapFunction t
+  -- TODO: we're being lazy here, and lying to LiftMask about the type
+  -- so we don't have to investigate the selector. This will probably bite us
+  -- later. Maybe write some nice wrapper around liftMask since it will get called in a lot of the builtin modifiers?
+  let liftMask = fetchBuiltin (selectorType ->> TApp TList TUnit ->> TApp TList TBool) LiftMask
+  msk <- applyValue liftMask predicate
+  env <- ask
+  case d of
+    VDice dice -> return $ VDice $ do
+      out <- dice
+      maskResult <- (applyValueRoll env msk (VList [out])) >>= assertList
+      case maskResult of
+        [VBool True] -> trueFn dice out
+        [VBool False] -> falseFn dice out
+        sk -> throwError $ InterpreterBug $ prettyPrint blt <> " msk should've returned a list of one Bool, got " <> prettyPrint sk
+    VPool pool src -> return $ VPool pool' src where
+      pool' = do
+        vals <- pool
+        maskResult <- (applyValueRoll env msk (VList vals)) >>= assertList
+        let applyOne v m = case m of
+              (VBool True) -> trueFn src v
+              (VBool False) -> falseFn src v
+              sk -> throwError $ InterpreterBug $ prettyPrint blt <> " msk should've returned a Bool, got " <> prettyPrint sk
+        marked <- zipWithM applyOne vals maskResult
+        return marked
+
+    e -> throwError $ InterpreterBug $ prettyPrint blt <> " input should be rollable, got " <> prettyPrint e
+
 
 -- the bigass match
 fetchBuiltin :: WeedType -> Builtin -> Value
@@ -296,38 +343,7 @@ fetchBuiltin _ Poolify = liftValue2 poolify
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertList xs
   VNumber . sum <$> mapM assertNumber xs'
-fetchBuiltin t Keep = liftValue2 $ \predicate d -> do
-  let selectorType = head $ unwrapFunction t
-  -- TODO: we're being lazy here, and lying to LiftMask about the type
-  -- so we don't have to investigate the selector. This will probably bite us
-  -- later. Maybe write some nice wrapper around liftMask since it will get called in a lot of the builtin modifiers?
-  let liftMask = fetchBuiltin (selectorType ->> TApp TList TUnit ->> TApp TList TBool) LiftMask
-  msk <- applyValue liftMask predicate
-  env <- ask
-  let markDropped v = case v of
-       VNumber n -> VNumber $ ((metadata . _Just . dropped) .~ True) n
-       o' -> o' -- TODO: non-numbers don't have metadata (perhaps they should?)
-  case d of
-    VDice dice -> return $ VDice $ do
-      out <- dice
-      shouldKeep <- (applyValueRoll env msk (VList [out])) >>= assertList
-      case shouldKeep of
-        [VBool True] -> return out
-        [VBool False] -> return $ markDropped out
-        sk -> throwError $ InterpreterBug $ "Keep msk should've returned a list of one Bool, got " <> prettyPrint sk
-    VPool pool src -> return $ VPool pool' src where
-      pool' = do
-        vals <- pool
-        shouldKeep <- (applyValueRoll env msk (VList vals)) >>= assertList
-        let dropOne v m = case m of
-              (VBool True) -> return v
-              (VBool False) -> return $ markDropped v
-              sk -> throwError $ InterpreterBug $ "Keep msk should've returned a Bool, got " <> prettyPrint sk
-        marked <- zipWithM dropOne vals shouldKeep
-        return marked
-
-    e -> throwError $ InterpreterBug $ "keep input should be rollable, got " <> prettyPrint e
-
+fetchBuiltin t Keep = mkPredicateMapModifier Keep (const return) (const $ return . markDropped) t
 fetchBuiltin _ Approximate = liftNumber (value %~ approximate)
 fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n
