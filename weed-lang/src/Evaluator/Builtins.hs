@@ -9,11 +9,13 @@ import Evaluator.Assertions
 import Evaluator.Builtins.DicePrimitives qualified as D
 import Evaluator.Types
 import Evaluator.WeedNumber
+import Evaluator.Metadata
 import Formatting.Pretty (prettyPrint)
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
-import Control.Lens ((%~))
+import Control.Lens ((%~), (.~), _Just)
 import TowerNumber.Core (approximate)
+import Data.List.NonEmpty qualified as N
 
 --
 -- Helper functions to lift functions into builtins that automatically lift/collapse into dice expressions.
@@ -113,6 +115,15 @@ fetchOutputType1 _ = throwError $ InterpreterBug "fetchOutputType1 got an invali
 fetchOutputType2 :: WeedType -> Eval WeedType
 fetchOutputType2 (TFunction _ (TFunction _ t)) = return t
 fetchOutputType2 _ = throwError $ InterpreterBug "fetchOutputType2 got an invalid type"
+
+---
+--- Type Helpers
+---
+
+unwrapFunction :: WeedType -> NonEmpty WeedType
+unwrapFunction (TFunction a b) = a N.<| unwrapFunction b
+unwrapFunction t = one t
+
 
 -- the bigass match
 fetchBuiltin :: WeedType -> Builtin -> Value
@@ -236,12 +247,8 @@ fetchBuiltin _ Bind = liftValue2 $ \m f -> do
       return $ VPool boundPool boundSource
     _ -> throwError $ InterpreterBug $ "Bind called on a non-monad (" <> prettyPrint m <> ">>=" <> prettyPrint f <> ")"
 fetchBuiltin t LiftMask =
-  let unwrapFunction :: WeedType -> [WeedType]
-      unwrapFunction (TFunction a b) = a : unwrapFunction b
-      unwrapFunction ty = [ty]
-
-      getLiftMaskType :: WeedType -> Either EvaluationError Bool
-      getLiftMaskType ty = case unwrapFunction ty of
+  let getLiftMaskType :: WeedType -> Either EvaluationError Bool
+      getLiftMaskType ty = case N.toList $ unwrapFunction ty of
         [TFunction (TApp TList _) (TApp TList TBool), TApp TList _, TApp TList TBool] -> return True
         [TFunction _ TBool, TApp TList _, TApp TList TBool] -> return False
         e -> throwError $ InterpreterBug $ "LiftMask input type was " <> prettyPrint ty <> " unwrapped as " <> prettyPrint e
@@ -289,6 +296,38 @@ fetchBuiltin _ Poolify = liftValue2 poolify
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertList xs
   VNumber . sum <$> mapM assertNumber xs'
+fetchBuiltin t Keep = liftValue2 $ \predicate d -> do
+  let selectorType = head $ unwrapFunction t
+  -- TODO: we're being lazy here, and lying to LiftMask about the type
+  -- so we don't have to investigate the selector. This will probably bite us
+  -- later. Maybe write some nice wrapper around liftMask since it will get called in a lot of the builtin modifiers?
+  let liftMask = fetchBuiltin (selectorType ->> TApp TList TUnit ->> TApp TList TBool) LiftMask
+  msk <- applyValue liftMask predicate
+  env <- ask
+  let markDropped v = case v of
+       VNumber n -> VNumber $ ((metadata . _Just . dropped) .~ True) n
+       o' -> o' -- TODO: non-numbers don't have metadata (perhaps they should?)
+  case d of
+    VDice dice -> return $ VDice $ do
+      out <- dice
+      shouldKeep <- (applyValueRoll env msk (VList [out])) >>= assertList
+      case shouldKeep of
+        [VBool True] -> return out
+        [VBool False] -> return $ markDropped out
+        sk -> throwError $ InterpreterBug $ "Keep msk should've returned a list of one Bool, got " <> prettyPrint sk
+    VPool pool src -> return $ VPool pool' src where
+      pool' = do
+        vals <- pool
+        shouldKeep <- (applyValueRoll env msk (VList vals)) >>= assertList
+        let dropOne v m = case m of
+              (VBool True) -> return v
+              (VBool False) -> return $ markDropped v
+              sk -> throwError $ InterpreterBug $ "Keep msk should've returned a Bool, got " <> prettyPrint sk
+        marked <- zipWithM dropOne vals shouldKeep
+        return marked
+
+    e -> throwError $ InterpreterBug $ "keep input should be rollable, got " <> prettyPrint e
+
 fetchBuiltin _ Approximate = liftNumber (value %~ approximate)
 fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n

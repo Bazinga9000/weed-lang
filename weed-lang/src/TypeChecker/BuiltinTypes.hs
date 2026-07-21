@@ -132,6 +132,14 @@ builtinType Poolify = do
   tv <- fresh
   return $ ForAll [tv] [] (TNumber ->> mkDice (TVar tv) ->> mkPool (TVar tv))
 builtinType Sum = return $ noPoly (mkList TNumber ->> TNumber)
+builtinType Keep = do
+  s <- fresh
+  a <- fresh
+  r <- fresh
+  let ts = TVar s
+      ta = TVar a
+      tr = TVar r
+  return $ ForAll [s, a, r] [CInstanceOf $ CRollable tr, CInstanceOf $ CSelector ta ts] (ts ->> TApp tr ta ->> TApp tr ta)
 builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
 builtinType Highest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)
 builtinType Lowest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)
