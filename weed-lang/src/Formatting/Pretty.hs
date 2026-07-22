@@ -6,7 +6,9 @@ import Control.Monad.Writer.CPS
 import Data.Text qualified as T
 import Evaluator.Types
 import Evaluator.WeedNumber (WeedNumber, metadata, value)
+import Evaluator.DropList
 import Formatting.Metadata
+import Formatting.ANSI
 import TowerNumber.Core (TowerNumber)
 import TowerNumber.Parse (formatTN)
 import TypeChecker.Types
@@ -139,6 +141,13 @@ instance Pretty WeedNumber where
     Just md -> formatWithMetadata md tnText
     where
       tnText = prettyPrint $ wn ^. value
+
+instance Pretty a => Pretty (DropItem a) where
+  prettyPrint (K a) = prettyPrint a
+  prettyPrint (D a) = ansiFormatString Gray Normal $ clearANSI (prettyPrint a) <> "×"
+
+instance Pretty a => Pretty (DropList a) where
+  prettyPrint (DropList xs) = prettyPrint xs
 
 instance Pretty Value where
   prettyPrint (VNumber n) = prettyPrint n
