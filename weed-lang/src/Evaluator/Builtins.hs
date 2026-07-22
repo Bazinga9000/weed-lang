@@ -158,7 +158,7 @@ mkPredicateMapModifier blt trueFn falseFn t = liftValue2 $ \predicate d -> do
   case d of
     VDice dice -> return $ VDice $ do
       out <- dice
-      maskResult <- (applyValueRoll env msk (VList [out])) >>= assertList
+      maskResult <- applyValueRoll env msk (VList [out]) >>= assertList
       case maskResult of
         [VBool True] -> trueFn dice out
         [VBool False] -> falseFn dice out
@@ -166,13 +166,12 @@ mkPredicateMapModifier blt trueFn falseFn t = liftValue2 $ \predicate d -> do
     VPool pool src -> return $ VPool pool' src where
       pool' = do
         vals <- pool
-        maskResult <- (applyValueRoll env msk (VList vals)) >>= assertList
+        maskResult <- applyValueRoll env msk (VList vals) >>= assertList
         let applyOne v m = case m of
               (VBool True) -> trueFn src v
               (VBool False) -> falseFn src v
               sk -> throwError $ InterpreterBug $ prettyPrint blt <> " msk should've returned a Bool, got " <> prettyPrint sk
-        marked <- zipWithM applyOne vals maskResult
-        return marked
+        zipWithM applyOne vals maskResult
 
     e -> throwError $ InterpreterBug $ prettyPrint blt <> " input should be rollable, got " <> prettyPrint e
 
@@ -354,7 +353,7 @@ fetchBuiltin _ Explode = liftValue2 $ \predicate d -> do
   env <- ask
   let mkExplode :: Roll Value -> Value -> Roll [Value]
       mkExplode src v = do
-        maskResult <- (applyValueRoll env predicate v) >>= assertBool
+        maskResult <- applyValueRoll env predicate v >>= assertBool
         case maskResult of
           False -> return [v]
           True -> do
@@ -363,7 +362,7 @@ fetchBuiltin _ Explode = liftValue2 $ \predicate d -> do
   case d of
     VDice dice -> return $ VPool (dice >>= mkExplode dice) dice
     VPool pool src -> return $ VPool pool' src where
-      pool' = join <$> (join $ (mapM (mkExplode src)) <$> pool)
+      pool' = join <$> (mapM (mkExplode src) =<< pool)
     e -> throwError $ InterpreterBug $ prettyPrint Explode <> " input should be rollable, got " <> prettyPrint e
 fetchBuiltin _ Approximate = liftNumber (value %~ approximate)
 fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do

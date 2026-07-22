@@ -19,7 +19,7 @@ markMetadata m = critSuccessMark <> critFailMark <> extraMark <> droppedMark
     critSuccessMark = mkMark ("☆", "★") (m ^. critLevel)
     critFailMark = mkMark ("†", "‡") (m ^. failLevel)
     extraMark = mkMark ("⊕", "⊕") (m ^. extraDice)
-    droppedMark = if (m ^. dropped) then "×" else ""
+    droppedMark = if m ^. dropped then "×" else ""
 
 formatWithMetadata :: NumberMetadata -> Text -> Text
 formatWithMetadata md inText = case colorMetadata md of
