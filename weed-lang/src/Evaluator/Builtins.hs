@@ -133,6 +133,11 @@ markDropped v = case v of
      VNumber n -> VNumber $ ((metadata . _Just . dropped) .~ True) n
      o' -> o' -- TODO: non-numbers don't have metadata (perhaps they should?)
 
+freshExtra :: Value -> Value
+freshExtra v = case v of
+     VNumber n -> VNumber $ ((metadata . _Just . extraDice) .~ Multibool (1,0)) n
+     o' -> o' -- see above
+
 --- Construct the builtin for a modifier like keep.
 -- Takes in
 -- (1) the name of the builtin
@@ -345,6 +350,21 @@ fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   VNumber . sum <$> mapM assertNumber xs'
 fetchBuiltin t Keep = mkPredicateMapModifier Keep (const return) (const $ return . markDropped) t
 fetchBuiltin t Drop = mkPredicateMapModifier Keep (const $ return . markDropped) (const return) t
+fetchBuiltin _ Explode = liftValue2 $ \predicate d -> do
+  env <- ask
+  let mkExplode :: Roll Value -> Value -> Roll [Value]
+      mkExplode src v = do
+        maskResult <- (applyValueRoll env predicate v) >>= assertBool
+        case maskResult of
+          False -> return [v]
+          True -> do
+            new <- freshExtra <$> src
+            (v:) <$> mkExplode src new
+  case d of
+    VDice dice -> return $ VPool (dice >>= mkExplode dice) dice
+    VPool pool src -> return $ VPool pool' src where
+      pool' = join <$> (join $ (mapM (mkExplode src)) <$> pool)
+    e -> throwError $ InterpreterBug $ prettyPrint Explode <> " input should be rollable, got " <> prettyPrint e
 fetchBuiltin _ Approximate = liftNumber (value %~ approximate)
 fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n

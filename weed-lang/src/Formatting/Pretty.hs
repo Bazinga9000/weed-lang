@@ -88,6 +88,7 @@ instance Pretty Builtin where
   prettyPrint Sum = "sum"
   prettyPrint Keep = "keep"
   prettyPrint Drop = "drop"
+  prettyPrint Explode = "explode"
   prettyPrint Approximate = "approximate"
   prettyPrint Highest = "highest"
   prettyPrint Lowest = "lowest"

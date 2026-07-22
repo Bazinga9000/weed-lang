@@ -223,6 +223,7 @@ builtinEnv =
     ("sum", Sum),
     ("keep", Keep),
     ("drop", Drop),
+    ("explode", Explode),
     ("approximate", Approximate),
     ("highest", Highest),
     ("lowest", Lowest)

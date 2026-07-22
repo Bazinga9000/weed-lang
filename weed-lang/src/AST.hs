@@ -74,6 +74,7 @@ data Builtin -- unary operators
   | Sum
   | Keep
   | Drop
+  | Explode
   | Approximate
   | -- list operations
     Highest

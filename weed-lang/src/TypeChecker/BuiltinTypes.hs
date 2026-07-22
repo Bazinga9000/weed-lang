@@ -144,6 +144,12 @@ builtinType Poolify = do
 builtinType Sum = return $ noPoly (mkList TNumber ->> TNumber)
 builtinType Keep = predicateMapModifier
 builtinType Drop = predicateMapModifier
+builtinType Explode = do
+  a <- fresh
+  r <- fresh
+  let ta = TVar a
+      tr = TVar r
+  return $ ForAll [a, r] [CInstanceOf $ CRollable tr] ((ta ->> TBool) ->> TApp tr ta ->> TApp TPool ta)
 builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
 builtinType Highest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)
 builtinType Lowest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)

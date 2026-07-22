@@ -18,7 +18,7 @@ markMetadata m = critSuccessMark <> critFailMark <> extraMark <> droppedMark
   where
     critSuccessMark = mkMark ("☆", "★") (m ^. critLevel)
     critFailMark = mkMark ("†", "‡") (m ^. failLevel)
-    extraMark = mkMark ("!", "!") (m ^. extraDice)
+    extraMark = mkMark ("⊕", "⊕") (m ^. extraDice)
     droppedMark = if (m ^. dropped) then "×" else ""
 
 formatWithMetadata :: NumberMetadata -> Text -> Text

@@ -809,10 +809,10 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 
 #builtin(
   "explode",
-  "Rollable r, Selector a s => s -> r a -> Pool a",
+  "Rollable r => (a -> Bool) -> r a -> Pool a",
   "Dice Modifiers",
 )[
-  Each die that satisfies the Selector will spawn an additional copy of itself (whose output is tagged Extra) and add it to the resulting Pool. This applies recursively.
+  Each die that satisfies the predicate will spawn an additional copy of itself (whose output is tagged Extra) and add it to the resulting Pool. This applies recursively.
 ]
 
 #builtin(
