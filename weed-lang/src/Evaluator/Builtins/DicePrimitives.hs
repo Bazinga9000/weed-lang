@@ -61,10 +61,7 @@ d = wrapOne (DiceD, "a positive integer") assertPositive dCore
 s :: Value
 s = wrapOne (DiceS, "a non-empty list") assertNonEmptyList sCore
   where
-    sCore nel = mkBlank <$> (elements . toList $ nel)
-
-    mkBlank (VNumber wn) = VNumber $ (metadata ?~ mempty) wn
-    mkBlank v = v
+    sCore nel = elements . toList $ nel
 
 -- fudge die
 -- samples a uniform integer from [-bound, bound]
