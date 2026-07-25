@@ -94,6 +94,7 @@ instance Pretty Builtin where
   prettyPrint Approximate = "approximate"
   prettyPrint Highest = "highest"
   prettyPrint Lowest = "lowest"
+  prettyPrint Length = "length"
 
 instance Pretty IdentifierName where
   prettyPrint (S s) = show s

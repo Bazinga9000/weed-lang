@@ -153,3 +153,7 @@ builtinType Explode = do
 builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
 builtinType Highest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)
 builtinType Lowest = return $ noPoly (TNumber ->> mkList TNumber ->> mkList TBool)
+builtinType Length = do
+  a <- fresh
+  let ta = TVar a
+  return $ ForAll [a] [] (TApp TList ta ->> TNumber)

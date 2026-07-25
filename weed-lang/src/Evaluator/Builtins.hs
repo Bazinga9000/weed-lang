@@ -411,3 +411,4 @@ fetchBuiltin _ Lowest  = liftValue2 $ \n xs -> do
         (top, rest) = splitAt (fromIntegral n') sortedByVal
         tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
   VList . fmap VBool . (liftPredicate lowest) <$> mapMDropList (assertReal Lowest) xs'
+fetchBuiltin _ Length = VBuiltin $ \xs -> (VNumber . fromIntegral . length . getKept) <$> assertList xs

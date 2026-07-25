@@ -851,4 +851,20 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   As #ref-b("highest"), but the bit mask has the lowest $n$ elements set.
 ]
 
+#builtin(
+  "length",
+  "[a] -> Natural",
+  "List Operations",
+  examples: [
+    ```hs
+    length [] -- 0
+    length [1, 1, 0, 3, 7] -- 5
+    4d6 | length -- 4
+    20d6 | drop (lowest 7) | length -- 13
+    ```
+  ]
+)[
+  Returns the number of (non-dropped) elements in the given list.
+]
+
 // == Standard Library Functions
