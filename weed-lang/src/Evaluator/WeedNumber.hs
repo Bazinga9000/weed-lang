@@ -25,12 +25,7 @@ lift1WN f x = x & value %~ f
 
 -- all binary operations on WeedNumbers respect the drop semantics
 lift2WN :: (TowerNumber -> TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber -> WeedNumber
-lift2WN f x y
-  | wnDropped x && wnDropped y = blank 0
-  | wnDropped x = y
-  | wnDropped y = x
-  | otherwise =
-      WeedNumber
+lift2WN f x y = WeedNumber
         { _value = f (x ^. value) (y ^. value),
           _metadata = (x ^. metadata) <> (y ^. metadata)
         }
@@ -98,6 +93,3 @@ wnLiftMeta f n = n & metadata . _Just %~ f
 
 wnIsPure :: WeedNumber -> Bool
 wnIsPure = has (metadata . _Nothing)
-
-wnDropped :: WeedNumber -> Bool
-wnDropped n = maybe False (^. dropped) (n ^. metadata)

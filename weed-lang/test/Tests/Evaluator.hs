@@ -4,6 +4,7 @@ import AST
 import Evaluator
 import Evaluator.Types
 import Evaluator.WeedNumber
+import Evaluator.DropList
 import Formatting.Pretty (prettyPrint)
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -14,7 +15,9 @@ eqObservable :: Value -> Value -> Bool
 eqObservable (VNumber a) (VNumber b) = a =~= b
 eqObservable (VBool a) (VBool b) = a == b
 eqObservable VUnit VUnit = True
-eqObservable (VList as) (VList bs) = length as == length bs && and (zipWith eqObservable as bs)
+eqObservable (VList as) (VList bs) = length as' == length bs' && and (zipWith eqObservable as' bs') where
+  as' = getKept as
+  bs' = getKept bs
 eqObservable _ _ = False
 
 -- eqError :: EvaluationError -> EvaluationError -> Bool
@@ -74,7 +77,7 @@ idX = S "x"
 mkHiLoTest :: Builtin -> String -> [Integer] -> [Bool] -> Integer -> TestTree
 mkHiLoTest hiLo name input output n = testCase name $ do
   let listArgs = CTList tListNum (map cNum input)
-  let expected = VList $ map VBool output
+  let expected = VList $ fmap VBool $ toDropList output
   let predicateT = tListNum ->> TApp TList TBool
   let builtinT = TNumber ->> predicateT
   let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs
@@ -89,13 +92,13 @@ evaluatorTests =
         [ testCase "return 5 -> [5] (return explicitly typed as Number -> List Number)" $ do
             let returnE = CTIdentifier (tNum ->> tListNum) (B Return)
             let expr = CTApply tListNum returnE (cNum 5)
-            assertEval expr (VList [vNum 5]),
+            assertEval expr (VList $ toDropList [vNum 5]),
           testCase "fmap (const 99) [1, 2] -> [99, 99]" $ do
             let listArg = CTList tListNum [cNum 1, cNum 2]
             let mapFunc = CTLambda (TFunction TNumber TNumber) idX (cNum 99)
             let mapE = CTIdentifier ((tNum ->> tNum) ->> tListNum ->> tListNum) (B Map)
             let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) mapE mapFunc) listArg
-            assertEval expr (VList [vNum 99, vNum 99]),
+            assertEval expr (VList $ toDropList [vNum 99, vNum 99]),
           testCase "[const 8, const 9] <*> [1, 2] -> [8, 8, 9, 9]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
 
@@ -107,7 +110,7 @@ evaluatorTests =
 
             let apE = CTIdentifier (lFuncT ->> tListNum ->> tListNum) (B Ap)
             let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) apE listFuncs) listArgs
-            assertEval expr (VList [vNum 8, vNum 8, vNum 9, vNum 9]),
+            assertEval expr (VList $ toDropList [vNum 8, vNum 8, vNum 9, vNum 9]),
           testCase "[_ + 1, _ + 2] <*> [5, 10] -> [6, 11, 7, 12]" $ do
             let listArgs = CTList tListNum [cNum 5, cNum 10]
 
@@ -124,7 +127,7 @@ evaluatorTests =
 
             let apE = CTIdentifier (lFuncT ->> tListNum ->> tListNum) (B Ap)
             let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) apE listFuncs) listArgs
-            assertEval expr (VList [vNum 6, vNum 11, vNum 7, vNum 12]),
+            assertEval expr (VList $ toDropList [vNum 6, vNum 11, vNum 7, vNum 12]),
           testCase "[1, 2] >>= \\x -> [x, x] -> [1, 1, 2, 2]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
             let bindFunc =
@@ -141,14 +144,14 @@ evaluatorTests =
             let bindT = tListNum ->> (tNum ->> tListNum) ->> tListNum
             let bindE = CTIdentifier bindT (B Bind)
             let expr = CTApply tListNum (CTApply bindT bindE listArgs) bindFunc
-            assertEval expr (VList [vNum 1, vNum 1, vNum 2, vNum 2]),
+            assertEval expr (VList $ toDropList [vNum 1, vNum 1, vNum 2, vNum 2]),
           testCase "liftMask (_ == 1) [1, 2, 3] -> [True, False, False]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2, cNum 3]
             let predicateT = tListNum ->> TApp TList TBool
             let liftMaskT = (TNumber ->> TBool) ->> predicateT
             let selectorFunc = CTApply (TFunction TNumber TBool) (CTIdentifier (TFunction TNumber (TFunction TNumber TBool)) (B Eq)) (cNum 1)
             let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs
-            assertEval expr (VList [VBool True, VBool False, VBool False]),
+            assertEval expr (VList $ toDropList [VBool True, VBool False, VBool False]),
           mkHiLoTest Highest "highest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, False, True, False, False, False, True, True, False, False, False, False] 3,
           mkHiLoTest Lowest "lowest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, True, False, False, True, False, False, False, False, False, True, False] 3,
           mkHiLoTest Highest "highest is stable" [1, 2, 3, 5, 5, 5, 5, 4] [False, False, False, True, True, True, False, False] 3,

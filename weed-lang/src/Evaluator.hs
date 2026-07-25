@@ -9,6 +9,7 @@ import Data.Map qualified as Map
 import {-# SOURCE #-} Evaluator.Builtins
 import Evaluator.Types
 import Evaluator.WeedNumber
+import Evaluator.DropList
 
 runEval :: Env -> Eval a -> Either EvaluationError a
 runEval env ev = let r = runExceptT ev in runReader r env
@@ -32,7 +33,7 @@ eval (CTBool b) = return $ VBool b
 eval CTUnit = return VUnit
 eval (CTList _ xs) = do
   xs' <- mapM eval xs
-  return $ VList xs'
+  return $ VList $ toDropList xs'
 eval (CTIdentifier t (B builtin)) = return $ fetchBuiltin t builtin
 eval (CTIdentifier _ ident) = do
   env <- ask
@@ -96,7 +97,7 @@ eval (CTIf _ cond t f) = do
         s' = s >>= runCond
         p' = do
           vs <- p
-          mapM runCond vs
+          mapMDropList runCond vs
     _ -> throwError $ InterpreterBug "Evaluator got a non-boolean condition"
 
 evalPreSample :: CoreTypedExpr -> Either EvaluationError Value

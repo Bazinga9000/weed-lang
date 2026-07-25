@@ -5,6 +5,7 @@ import Control.Lens hiding (Identity)
 import Control.Monad.Except
 import Evaluator.Types
 import Evaluator.WeedNumber
+import Evaluator.DropList
 import TowerNumber.Core
 import TypeChecker.Types
 import Prelude hiding (Identity)
@@ -32,22 +33,22 @@ assertRealPredicate f v = do
 assertPositiveReal :: (MonadError EvaluationError m) => Value -> m Double
 assertPositiveReal = assertRealPredicate (> 0)
 
-assertList :: (MonadError EvaluationError m) => Value -> m [Value]
+assertList :: (MonadError EvaluationError m) => Value -> m (DropList Value)
 assertList (VList xs) = return xs
 assertList e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
 
-assertNonEmptyList :: (MonadError EvaluationError m) => Value -> m (NonEmpty Value)
+assertNonEmptyList :: (MonadError EvaluationError m) => Value -> m (NonEmpty (DropItem Value))
 assertNonEmptyList v = do
   l <- assertList v
-  case nonEmpty l of
-    Just ne -> return ne
+  case nonEmpty $ getKept l of
+    Just ne -> return $ fmap K ne
     Nothing -> throwError $ InterpreterBug "Uncaught error from assertNonEmptyList (the caller should provide more details!)"
 
 assertDice :: (MonadError EvaluationError m) => Value -> m (Roll Value)
 assertDice (VDice r) = return r
 assertDice e = throwError $ TypeError TDice e
 
-assertPool :: (MonadError EvaluationError m) => Value -> m (Roll [Value], Roll Value)
+assertPool :: (MonadError EvaluationError m) => Value -> m (Roll (DropList Value), Roll Value)
 assertPool (VPool r s) = return (r, s)
 assertPool e = throwError $ TypeError TPool e
 

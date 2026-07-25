@@ -7,6 +7,7 @@ import Control.Monad.Except
 import Evaluator
 import Evaluator.Assertions
 import Evaluator.Builtins.DicePrimitives qualified as D
+import Evaluator.DropList
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Evaluator.Metadata
@@ -66,9 +67,9 @@ equality VUnit VUnit = return $ VBool True
 equality (VClosure {}) (VClosure {}) = throwError $ InterpreterBug "equality check got function"
 equality (VBuiltin _) (VBuiltin _) = throwError $ InterpreterBug "equality check got function"
 equality (VList a) (VList b)
-  | length a /= length b = return $ VBool False
+  | length (getKept a) /= length (getKept b) = return $ VBool False
   | otherwise = do
-      eqs <- zipWithM equality a b >>= mapM assertBool
+      eqs <- zipWithM equality (getKept a) (getKept b) >>= mapM assertBool
       return $ VBool (and eqs)
 equality (VDice _) (VDice _) = throwError $ InterpreterBug "equality check got dice"
 equality (VPool _ _) (VPool _ _) = throwError $ InterpreterBug "equality check got pool"
@@ -80,7 +81,7 @@ comparison _ (VBool a) (VBool b) = return $ compare a b
 comparison _ VUnit VUnit = return EQ
 comparison _ (VClosure {}) (VClosure {}) = throwError $ InterpreterBug "comparison got function"
 comparison _ (VBuiltin _) (VBuiltin _) = throwError $ InterpreterBug "comparison got function"
-comparison blt (VList l1) (VList l2) = compareLists l1 l2 where
+comparison blt (VList l1) (VList l2) = compareLists (getKept l1) (getKept l2) where
   compareLists [] [] = return EQ
   compareLists _ [] = return GT
   compareLists [] _ = return LT
@@ -128,17 +129,21 @@ unwrapFunction t = one t
 --- Dice Helpers
 ---
 
-markDropped :: Value -> Value
-markDropped v = case v of
-     VNumber n -> VNumber $ ((metadata . _Just . dropped) .~ True) n
-     o' -> o' -- TODO: non-numbers don't have metadata (perhaps they should?)
-
 freshExtra :: Value -> Value
 freshExtra v = case v of
      VNumber n -> VNumber $ ((metadata . _Just . extraDice) .~ Multibool (1,0)) n
-     o' -> o' -- see above
+     o' -> o' -- TODO: non-numbers don't have metadata (perhaps they should?)
 
---- Construct the builtin for a modifier like keep.
+runLiftMask :: WeedType -> Value -> Eval Value
+runLiftMask t predicate = do
+  let selectorType = head $ unwrapFunction t
+  -- TODO: we're being lazy here, and lying to LiftMask about the type
+  -- so we don't have to investigate the selector. This will probably bite us
+  -- later. Maybe write some nice wrapper around liftMask since it will get called in a lot of the builtin modifiers?
+  let liftMask = fetchBuiltin (selectorType ->> TApp TList TUnit ->> TApp TList TBool) LiftMask
+  applyValue liftMask predicate
+
+--- Construct the builtin for a modifier like reroll.
 -- Takes in
 -- (1) the name of the builtin
 -- (2) two functions (with access to the canonical generator)
@@ -146,35 +151,52 @@ freshExtra v = case v of
 -- (2b) what to do if the predicate does NOT hold
 -- (3) the type assigned to the builtin
 -- and generates the builtin which checks each roll against the predicate, and mutates it according to the function
-mkPredicateMapModifier :: Builtin -> (Roll Value -> Value -> Roll Value) -> (Roll Value -> Value -> Roll Value) -> WeedType -> Value
-mkPredicateMapModifier blt trueFn falseFn t = liftValue2 $ \predicate d -> do
-  let selectorType = head $ unwrapFunction t
-  -- TODO: we're being lazy here, and lying to LiftMask about the type
-  -- so we don't have to investigate the selector. This will probably bite us
-  -- later. Maybe write some nice wrapper around liftMask since it will get called in a lot of the builtin modifiers?
-  let liftMask = fetchBuiltin (selectorType ->> TApp TList TUnit ->> TApp TList TBool) LiftMask
-  msk <- applyValue liftMask predicate
+-- this form will pass through the K/D values of the input and predicate (either dropped -> output dropped)
+-- mkPredicateMapModifier :: Builtin -> (Roll Value -> Value -> Roll Value) -> (Roll Value -> Value -> Roll Value) -> WeedType -> Value
+-- mkPredicateMapModifier blt trueFn falseFn t = liftValue2 $ \predicate d -> do
+--   env <- ask
+--   msk <- runLiftMask t predicate
+--   let runPool :: Roll (DropList Value) -> Roll Value -> Eval Value
+--       runPool pool src = return $ VPool pool' src where
+--         pool' = do
+--           vals <- pool
+--           maskResult <- applyValueRoll env msk (VList vals) >>= assertList
+--           let applyOne v m = case m of
+--                (VBool True) -> trueFn src v
+--                (VBool False) -> falseFn src v
+--                sk -> throwError $ InterpreterBug $ prettyPrint blt <> " msk should've returned a Bool, got " <> prettyPrint sk
+--           zipWithMDropList applyOne vals maskResult
+
+--   case d of
+--     VDice dice -> runPool (one <$> dice) dice
+--     VPool pool src -> runPool pool src
+--     e -> throwError $ InterpreterBug $ prettyPrint blt <> " input should be rollable, got " <> prettyPrint e
+
+-- construct the keep or drop modifier
+-- this form actually does inspect the K/D contents of its input lists
+mkKeepDrop :: Bool -> WeedType -> Value
+mkKeepDrop isKeep t = liftValue2 $ \predicate d -> do
   env <- ask
+  msk <- runLiftMask t predicate
+  let blt = if isKeep then Keep else Drop
+  let runPool :: Roll (DropList Value) -> Roll Value -> Eval Value
+      runPool pool src = return $ VPool pool' src where
+        pool' = do
+          vals <- pool
+          maskResult <- applyValueRoll env msk (VList vals) >>= assertList
+          let applyOne v m = case v of
+               (D _) -> return v
+               (K v') -> case m of
+                 (K (VBool True)) -> return $ if isKeep then K v' else D v'
+                 (K (VBool False)) -> return $ if isKeep then D v' else K v'
+                 (D (VBool _)) -> return $ D v'
+                 sk -> throwError $ InterpreterBug $ prettyPrint blt <> " msk should've returned a Bool, got " <> prettyPrint sk
+          DropList <$> zipWithM applyOne (getItems vals) (getItems maskResult)
+
   case d of
-    VDice dice -> return $ VDice $ do
-      out <- dice
-      maskResult <- applyValueRoll env msk (VList [out]) >>= assertList
-      case maskResult of
-        [VBool True] -> trueFn dice out
-        [VBool False] -> falseFn dice out
-        sk -> throwError $ InterpreterBug $ prettyPrint blt <> " msk should've returned a list of one Bool, got " <> prettyPrint sk
-    VPool pool src -> return $ VPool pool' src where
-      pool' = do
-        vals <- pool
-        maskResult <- applyValueRoll env msk (VList vals) >>= assertList
-        let applyOne v m = case m of
-              (VBool True) -> trueFn src v
-              (VBool False) -> falseFn src v
-              sk -> throwError $ InterpreterBug $ prettyPrint blt <> " msk should've returned a Bool, got " <> prettyPrint sk
-        zipWithM applyOne vals maskResult
-
+    VDice dice -> runPool (one <$> dice) dice
+    VPool pool src -> runPool pool src
     e -> throwError $ InterpreterBug $ prettyPrint blt <> " input should be rollable, got " <> prettyPrint e
-
 
 -- the bigass match
 fetchBuiltin :: WeedType -> Builtin -> Value
@@ -204,12 +226,14 @@ fetchBuiltin _ Identity = VBuiltin return
 fetchBuiltin _ Map = liftValue2 $ \f v -> do
   env <- ask
 
+
+
   -- map doesn't actually need to know its output type, it can be determined from the input type
   case v of
     VDice d -> return $ VDice $ d >>= applyValueRoll env f
-    VList l -> VList <$> mapM (applyValue f) l
+    VList l -> VList <$> mapMDropList (applyValue f) l where
     VPool pool source -> do
-      let mappedPool = pool >>= mapM (applyValueRoll env f)
+      let mappedPool = pool >>= mapMDropList (applyValueRoll env f)
       let mappedSource = source >>= applyValueRoll env f
       return $ VPool mappedPool mappedSource
     _ -> throwError $ InterpreterBug "map got a non-Functor argument"
@@ -222,13 +246,15 @@ fetchBuiltin _ MapP = liftValue2 $ \f p -> do
         applyValueRoll env f (VList rolls)
     _ -> throwError $ InterpreterBug "mapP got a non-pool argument"
 fetchBuiltin apt Ap = liftValue2 $ \mf ma -> do
+
+
   env <- ask
   t <- fetchOutputType2 apt
   case t of
     (TApp TList _) -> do
       lf <- assertList mf
       la <- assertList ma
-      VList <$> sequence (map applyValue lf <*> la)
+      VList <$> sequenceDropList (fmap applyValue lf <*> la)
     (TApp TDice _) -> do
       df <- assertDice mf
       da <- assertDice ma
@@ -244,7 +270,7 @@ fetchBuiltin apt Ap = liftValue2 $ \mf ma -> do
           ( do
               pf <- poolf
               pa <- poola
-              sequence $ map (applyValueRoll env) pf <*> pa
+              sequenceDropList $ fmap (applyValueRoll env) pf <*> pa
           )
           ( do
               vf <- sourcef
@@ -256,7 +282,7 @@ fetchBuiltin rett Return = VBuiltin $ \v -> do
   t <- fetchOutputType1 rett
   case t of
     (TApp TDice _) -> return $ VDice $ return v
-    (TApp TList _) -> return $ VList [v]
+    (TApp TList _) -> return $ VList $ one v
     (TApp TPool _) -> return $ VPool (return . return $ v) (return v)
     _ -> throwError $ InterpreterBug "Evaluator got an invalid type for return"
 fetchBuiltin _ Bind = liftValue2 $ \m f -> do
@@ -264,8 +290,8 @@ fetchBuiltin _ Bind = liftValue2 $ \m f -> do
 
   case m of
     VList l -> do
-      vs <- mapM (applyValue f) l
-      VList . concat <$> mapM assertList vs
+      vs <- mapMDropList (applyValue f) l
+      VList . join <$> mapMDropList assertList vs
     VDice d -> return $ VDice $ do
       v <- d
       bound <- applyValueRoll env f v
@@ -273,11 +299,11 @@ fetchBuiltin _ Bind = liftValue2 $ \m f -> do
         VDice d' -> d'
         e -> throwError $ InterpreterBug $ "Bind returned a non-dice value. " <> prettyPrint e
     VPool pool source -> do
-      let boundPool :: Roll [Value]
+      let boundPool :: Roll (DropList Value)
           boundPool = do
             evalList <- pool
             nestedLists <-
-              mapM
+              mapMDropList
                 ( \val -> do
                     bound <- applyValueRoll env f val
                     case bound of
@@ -285,7 +311,7 @@ fetchBuiltin _ Bind = liftValue2 $ \m f -> do
                       e -> throwError $ InterpreterBug $ "Bind (Pool) returned a non-pool value for the list. " <> prettyPrint e
                 )
                 evalList
-            return (concat nestedLists)
+            return (join nestedLists)
 
       let boundSource :: Roll Value
           boundSource = do
@@ -308,7 +334,7 @@ fetchBuiltin t LiftMask =
         Right True -> liftValue2 applyValue
         Right False -> liftValue2 $ \f a -> do
           as <- assertList a
-          VList <$> mapM (applyValue f) as
+          VList <$> mapMDropList (applyValue f) as
         Left e -> liftValue2 . const . const . throwError $ e
 fetchBuiltin _ DiceD = D.d
 fetchBuiltin _ DiceS = D.s
@@ -323,7 +349,7 @@ fetchBuiltin _ Constant = VBuiltin $ return . VDice . liftGen . return
 fetchBuiltin _ Collapse = VBuiltin collapse
   where
     collapse :: Value -> Eval Value
-    collapse (VPool pool _) = return $ VDice $ VNumber . sum <$> (pool >>= mapM assertNumber)
+    collapse (VPool pool _) = return $ VDice $ VNumber . sum . getKept <$> (pool >>= mapMDropList assertNumber)
     collapse e = throwError $ TypeError (mkPool TNumber) e
 fetchBuiltin _ Source = VBuiltin source
   where
@@ -341,28 +367,28 @@ fetchBuiltin _ Poolify = liftValue2 poolify
         Just count ->
           if count == 0
             then throwError $ BadDieParameter Poolify "expected a positive number of dice" v
-            else return $ VPool (replicateM count d) d
+            else return $ VPool (replicateMDropList count d) d
     poolify (VNumber _) e = throwError $ TypeError (mkDice TNumber) e
     poolify n _ = throwError $ TypeError TNumber n
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertList xs
-  VNumber . sum <$> mapM assertNumber xs'
-fetchBuiltin t Keep = mkPredicateMapModifier Keep (const return) (const $ return . markDropped) t
-fetchBuiltin t Drop = mkPredicateMapModifier Keep (const $ return . markDropped) (const return) t
+  VNumber . sum . getKept <$> mapMDropList assertNumber xs'
+fetchBuiltin t Keep = mkKeepDrop True t
+fetchBuiltin t Drop = mkKeepDrop False t
 fetchBuiltin _ Explode = liftValue2 $ \predicate d -> do
   env <- ask
-  let mkExplode :: Roll Value -> Value -> Roll [Value]
+  let mkExplode :: Roll Value -> Value -> Roll (DropList Value)
       mkExplode src v = do
         maskResult <- applyValueRoll env predicate v >>= assertBool
         case maskResult of
-          False -> return [v]
+          False -> return $ one v
           True -> do
             new <- freshExtra <$> src
-            (v:) <$> mkExplode src new
+            (v `consKeep`) <$> mkExplode src new
   case d of
     VDice dice -> return $ VPool (dice >>= mkExplode dice) dice
     VPool pool src -> return $ VPool pool' src where
-      pool' = join <$> (mapM (mkExplode src) =<< pool)
+      pool' = join <$> (mapMDropList (mkExplode src) =<< pool)
     e -> throwError $ InterpreterBug $ prettyPrint Explode <> " input should be rollable, got " <> prettyPrint e
 fetchBuiltin _ Approximate = liftNumber (value %~ approximate)
 fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
@@ -374,7 +400,7 @@ fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
         sortedByVal = sortOn (first Down) indexed
         (top, rest) = splitAt (fromIntegral n') sortedByVal
         tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
-  VList . map VBool . highest <$> mapM (assertReal Highest) xs'
+  VList . fmap VBool . (liftPredicate highest) <$> mapMDropList (assertReal Highest) xs'
 fetchBuiltin _ Lowest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n
   xs' <- assertList xs
@@ -384,4 +410,4 @@ fetchBuiltin _ Lowest  = liftValue2 $ \n xs -> do
         sortedByVal = sort indexed
         (top, rest) = splitAt (fromIntegral n') sortedByVal
         tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
-  VList . map VBool . lowest <$> mapM (assertReal Lowest) xs'
+  VList . fmap VBool . (liftPredicate lowest) <$> mapMDropList (assertReal Lowest) xs'
