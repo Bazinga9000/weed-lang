@@ -163,6 +163,7 @@ Atom  : num                          { SNumber $1 }
       | '_'                          { SHole }
       | '(' Exp ')'                  { SParens $2 }
       | '[' ListBody ']'             { SList $2 }
+      | '[' ']'                      { SList [] }
 
 BinOp : '.' { "." }
       | '^' { "^" }

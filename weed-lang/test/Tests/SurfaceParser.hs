@@ -32,7 +32,12 @@ surfaceParserTests =
           testCase "foo - Parses identifiers" $
             parse [TokenIdent "foo"] @?= SIdentifier (S "foo"),
           testCase "d - Parses builtins" $
-            parse [TokenBuiltin DiceD] @?= SIdentifier (B DiceD)
+            parse [TokenBuiltin DiceD] @?= SIdentifier (B DiceD),
+          testCase "[] - Parses empty list" $
+            parse [TokenLBracket, TokenRBracket] @?= SList [],
+          testCase "[1,2,3] - Parses nonempty list" $
+            parse [TokenLBracket, TokenNum 1.0, TokenComma, TokenNum 2.0, TokenComma, TokenNum 3.0, TokenRBracket]
+              @?= SList [SNumber 1.0, SNumber 2.0, SNumber 3.0]
         ],
       testGroup
         "Control Flow"
@@ -95,36 +100,12 @@ surfaceParserTests =
               @?= SInfix "+" SHole (SNumber 2.0),
           testCase "4d6 - Parses dice correctly" $
             -- the desugaring is done in the lowering step
-            -- the desugaring is done in the lowering step
-            -- the desugaring is done in the lowering step
-            -- the desugaring is done in the lowering step
-
-            -- the desugaring is done in the lowering step
-
-            -- the desugaring is done in the lowering step
-
-            -- the desugaring is done in the lowering step
-            -- the desugaring is done in the lowering step
-
-            -- the desugaring is done in the lowering step
             parse [TokenNum 4.0, TokenBuiltin DiceD, TokenNum 6.0]
               @?= SApply (SApply (SNumber 4.0) (SIdentifier (B DiceD))) (SNumber 6.0),
           testCase "3 | (_ + 5) - Parses pipes" $
             parse [TokenNum 3.0, TokenOp "|", TokenHole, TokenOp "+", TokenNum 5.0]
               @?= SPipe (SNumber 3.0) (SInfix "+" SHole (SNumber 5.0)),
           testCase "4 # d6 - Parses pool hash operator" $
-            -- # has fixity 5, Application has fixity 10
-            -- # has fixity 5, Application has fixity 10
-            -- # has fixity 5, Application has fixity 10
-            -- # has fixity 5, Application has fixity 10
-
-            -- # has fixity 5, Application has fixity 10
-
-            -- # has fixity 5, Application has fixity 10
-
-            -- # has fixity 5, Application has fixity 10
-            -- # has fixity 5, Application has fixity 10
-
             -- # has fixity 5, Application has fixity 10
             parse [TokenNum 4.0, TokenOp "#", TokenBuiltin DiceD, TokenNum 6.0]
               @?= SInfix "#" (SNumber 4.0) (SApply (SIdentifier (B DiceD)) (SNumber 6.0))
