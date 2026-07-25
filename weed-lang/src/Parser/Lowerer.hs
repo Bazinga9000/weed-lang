@@ -226,7 +226,8 @@ builtinEnv =
     ("explode", Explode),
     ("approximate", Approximate),
     ("highest", Highest),
-    ("lowest", Lowest)
+    ("lowest", Lowest),
+    ("length", Length)
   ]
 
 resolveBuiltins :: SurfaceExpr -> Lower SurfaceExpr

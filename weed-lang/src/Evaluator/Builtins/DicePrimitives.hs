@@ -10,6 +10,7 @@ import Evaluator.Assertions
 import Evaluator.Metadata
 import Evaluator.Types
 import Evaluator.WeedNumber
+import Evaluator.DropList (DropItem(K))
 import Numeric (log)
 import Test.QuickCheck.Gen
 import TowerNumber.Core
@@ -61,7 +62,7 @@ d = wrapOne (DiceD, "a positive integer") assertPositive dCore
 s :: Value
 s = wrapOne (DiceS, "a non-empty list") assertNonEmptyList sCore
   where
-    sCore nel = elements . toList $ nel
+    sCore nel = elements $ [x | K x <- toList nel]
 
 -- fudge die
 -- samples a uniform integer from [-bound, bound]

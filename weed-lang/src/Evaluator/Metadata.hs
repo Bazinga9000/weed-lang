@@ -42,7 +42,7 @@ mkMark (om, tm) mb = case getMark mb of
   TwoMarks -> tm
 
 data NumberMetadata = NumberMetadata
-  { _dropped :: Bool,
+  {
     _critLevel :: Multibool,
     _failLevel :: Multibool,
     _extraDice :: Multibool
@@ -54,7 +54,7 @@ makeLenses ''NumberMetadata
 instance Semigroup NumberMetadata where
   a <> b =
     NumberMetadata
-      { _dropped = _dropped a || _dropped b,
+      {
         _critLevel = _critLevel a <> _critLevel b,
         _failLevel = _failLevel a <> _failLevel b,
         _extraDice = _extraDice a <> _extraDice b
@@ -63,7 +63,7 @@ instance Semigroup NumberMetadata where
 instance Monoid NumberMetadata where
   mempty =
     NumberMetadata
-      { _dropped = False,
+      {
         _critLevel = mempty,
         _failLevel = mempty,
         _extraDice = mempty

@@ -6,7 +6,6 @@ import Formatting.ANSI
 
 colorMetadata :: NumberMetadata -> Maybe ANSIForegroundColor
 colorMetadata m
-  | m ^. dropped = Just Gray
   | hasTwoMarks (m ^. critLevel) && hasMark (m ^. failLevel) = Just Yellow
   | hasTwoMarks (m ^. critLevel) = Just Green
   | hasTwoMarks (m ^. failLevel) = Just Red
@@ -14,12 +13,11 @@ colorMetadata m
   | otherwise = Nothing
 
 markMetadata :: NumberMetadata -> Text
-markMetadata m = critSuccessMark <> critFailMark <> extraMark <> droppedMark
+markMetadata m = critSuccessMark <> critFailMark <> extraMark
   where
     critSuccessMark = mkMark ("☆", "★") (m ^. critLevel)
     critFailMark = mkMark ("†", "‡") (m ^. failLevel)
     extraMark = mkMark ("⊕", "⊕") (m ^. extraDice)
-    droppedMark = if m ^. dropped then "×" else ""
 
 formatWithMetadata :: NumberMetadata -> Text -> Text
 formatWithMetadata md inText = case colorMetadata md of

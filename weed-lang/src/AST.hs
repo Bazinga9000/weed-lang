@@ -79,6 +79,7 @@ data Builtin -- unary operators
   | -- list operations
     Highest
   | Lowest
+  | Length
   deriving (Show, Eq, Ord)
 
 data SurfaceExpr

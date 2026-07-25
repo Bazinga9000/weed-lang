@@ -3,6 +3,7 @@ module Evaluator.Types where
 import AST
 import Data.Map qualified as Map
 import Evaluator.WeedNumber (WeedNumber)
+import Evaluator.DropList (DropList)
 import Test.QuickCheck.Gen
 import TypeChecker.Types
 
@@ -36,8 +37,8 @@ data Value
   = VNumber WeedNumber
   | VBool Bool
   | VUnit
-  | VList [Value]
+  | VList (DropList Value)
   | VClosure Env IdentifierName CoreTypedExpr
   | VBuiltin (Value -> Eval Value)
   | VDice (Roll Value)
-  | VPool (Roll [Value]) (Roll Value) -- pool, source
+  | VPool (Roll (DropList Value)) (Roll Value) -- pool, source

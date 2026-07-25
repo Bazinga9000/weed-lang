@@ -240,35 +240,7 @@ This metadata is expressed with marks and color in frontends and can sometimes c
 
 === Types of Metadata
 
-There are two fundamnetal types of metadata:
-
-==== Boolean Metadata
-
-Boolean metadata can only take the values `True` and `False`. This type of metadata is generally used for properties intrinsic to the value itself, rather than it sources. To reflect this, accessors for Boolean metadata are prefixed with `is`.
-
-The following Boolean metadata exists:
-
-#table(
-  columns: (auto, auto, auto, auto),
-  align: center,
-  [Metadata], [Accessor], [Relevant Modifiers], [Description],
-  [Dropped],
-  [#ref-b("isDropped")],
-  [
-    #ref-b("keep")
-
-    #ref-b("drop")
-  ],
-  [
-    Values dropped from a Pool.
-
-    Binary operations where exactly one value is Dropped will return the other value unchanged.
-
-    Binary operations where both values are Dropped will return a pure `0`.
-
-    Applies no mark.
-  ],
-)
+As of now, there is only one type of numerical metadata, namely Multiboolean Metadata:
 
 ==== Multiboolean Metadata
 
@@ -338,9 +310,7 @@ Unary and binary operations have the following semantics on metadata:
 - Unary operations leave the metadata (or lack therof) of their argument unchanged.
 - Binary operations on two pure values are pure.
 - Binary operations on one pure value and one value with metadata inherit the metadata of the impure value.
-- If `a` and `b` both have metadata, and #raw(sym.diamond) is a binary arithmetic expression (like #ref-b("(+)")), #raw("a " + sym.diamond + " b")...
-  - ...is Dropped if *either* `a` or `b` is Dropped
-  - ...adds together the true and false counts for Crit, Fail, Reroll, and Extra
+- If `a` and `b` both have metadata, and #raw(sym.diamond) is a binary arithmetic expression (like #ref-b("(+)")), #raw("a " + sym.diamond + " b") adds together the true and false counts for Crit, Fail, Reroll, and Extra
 
 === Frontend Coloring Rules
 
@@ -364,6 +334,17 @@ Frontends will color printed numerical values according to the metadata that the
 
 _Note: Precise colors will depend on your frontend's theme, particularly its interpretation of ANSI codes._
 
+= List Semantics
+
+In #weed, working with `Pool`s also involves working with lists. As such, lists in WEED carry some metadata about their elements. In particular, every element in a list is tagged with whether that value is Kept or it is Dropped. All list elements are Kept unless explicitly marked Dropped. Currently, using the #ref-b("keep") and #ref-b("drop") is the only way to mark elements Dropped.
+
+As far as the rest of the language is concerned, Dropped elements do not exist. For example:
+- #ref-b("highest") will ignore Dropped elements.
+- A list of entirely Dropped elements will compare equal to the empty list and will have #ref-b("length") 0.
+- `20d6 | drop (lowest 4) | drop (lowest 5)` will always drop exactly nine elements
+- Sums will ignore dropped elements
+
+However, there is one exception: When front-ends display final results, Dropped elements of lists will be visible, but grayed out and marked with $×$.
 
 = Syntactic Holes
 
@@ -868,6 +849,22 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   ]
 )[
   As #ref-b("highest"), but the bit mask has the lowest $n$ elements set.
+]
+
+#builtin(
+  "length",
+  "[a] -> Natural",
+  "List Operations",
+  examples: [
+    ```hs
+    length [] -- 0
+    length [1, 1, 0, 3, 7] -- 5
+    4d6 | length -- 4
+    20d6 | drop (lowest 7) | length -- 13
+    ```
+  ]
+)[
+  Returns the number of (non-dropped) elements in the given list.
 ]
 
 // == Standard Library Functions

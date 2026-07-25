@@ -2,6 +2,7 @@ module Pipeline where
 
 import Evaluator
 import Evaluator.Types
+import Evaluator.DropList
 import Formatting.Pretty (prettyPrint)
 import Parser.Lexer
 import Parser.Lowerer
@@ -26,9 +27,9 @@ interpret input = do
 
 -- collapses (nested) lists of numbers into their sum
 autoSum :: Value -> Maybe Value
-autoSum (VList []) = Nothing -- empty lists don't count
+autoSum (VList (DropList [])) = Nothing -- empty lists don't count
 autoSum v = VNumber <$> as' v
   where
     as' (VNumber n) = Just n
-    as' (VList l) = foldlM (\a b -> (+ a) <$> b) 0 $ map as' l
+    as' (VList l) = foldlM (\a b -> (+ a) <$> b) 0 $ map as' $ getKept l
     as' _ = Nothing
