@@ -2,3 +2,4 @@ packages:
   weed-lang/
   weed-repl/
   weed-shds/
+  eris/
