@@ -400,7 +400,7 @@ fetchBuiltin _ Highest  = liftValue2 $ \n xs -> do
         sortedByVal = sortOn (first Down) indexed
         (top, rest) = splitAt (fromIntegral n') sortedByVal
         tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
-  VList . fmap VBool . (liftPredicate highest) <$> mapMDropList (assertReal Highest) xs'
+  VList . fmap VBool . liftPredicate highest <$> mapMDropList (assertReal Highest) xs'
 fetchBuiltin _ Lowest  = liftValue2 $ \n xs -> do
   n' <- assertNatural n
   xs' <- assertList xs
@@ -410,5 +410,5 @@ fetchBuiltin _ Lowest  = liftValue2 $ \n xs -> do
         sortedByVal = sort indexed
         (top, rest) = splitAt (fromIntegral n') sortedByVal
         tagged = [(i, True) | (_, i) <- top] ++ [(i, False) | (_, i) <- rest]
-  VList . fmap VBool . (liftPredicate lowest) <$> mapMDropList (assertReal Lowest) xs'
-fetchBuiltin _ Length = VBuiltin $ \xs -> (VNumber . fromIntegral . length . getKept) <$> assertList xs
+  VList . fmap VBool . liftPredicate lowest <$> mapMDropList (assertReal Lowest) xs'
+fetchBuiltin _ Length = VBuiltin (fmap (VNumber . fromIntegral . length . getKept) . assertList)

@@ -27,7 +27,7 @@ instance Monoid (DropList a) where
 
 instance One (DropList a) where
   type OneItem (DropList a) = a
-  one = DropList . (:[]) . K
+  one = DropList . one . K
 
 toDropList :: [a] -> DropList a
 toDropList = DropList . map K
@@ -69,7 +69,7 @@ zipWithMDropList :: Monad m => (a -> b -> m c) -> DropList a -> DropList b -> m 
 zipWithMDropList f (DropList xs) (DropList ys) = DropList <$> zipWithM (zipMOne f) xs ys
 
 replicateDropList :: Int -> a -> DropList a
-replicateDropList n = DropList . map K . replicate n
+replicateDropList n = DropList . replicate n . K
 
 replicateMDropList :: Monad m => Int -> m a -> m (DropList a)
 replicateMDropList n x = do
@@ -80,7 +80,7 @@ consDropList :: DropItem a -> DropList a -> DropList a
 consDropList x (DropList xs) = DropList (x : xs)
 
 consKeep :: a -> DropList a -> DropList a
-consKeep x (DropList xs) = DropList $ (K x):xs
+consKeep x (DropList xs) = DropList $ K x : xs
 
 liftPredicate :: ([a] -> [Bool]) -> DropList a -> DropList Bool
 liftPredicate p dl@(DropList xs) = DropList $ go xs (p $ getKept dl)

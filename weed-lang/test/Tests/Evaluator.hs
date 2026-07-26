@@ -77,7 +77,7 @@ idX = S "x"
 mkHiLoTest :: Builtin -> String -> [Integer] -> [Bool] -> Integer -> TestTree
 mkHiLoTest hiLo name input output n = testCase name $ do
   let listArgs = CTList tListNum (map cNum input)
-  let expected = VList $ fmap VBool $ toDropList output
+  let expected = VList (VBool <$> toDropList output)
   let predicateT = tListNum ->> TApp TList TBool
   let builtinT = TNumber ->> predicateT
   let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs
