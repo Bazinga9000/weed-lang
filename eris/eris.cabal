@@ -34,3 +34,7 @@ library
     build-depends:    array
                     , mtl
                     , containers
+                    , discord-haskell
+    exposed-modules: Prelude,
+                     Eris.Commands.Core,
+                     Eris.Commands.Registration
