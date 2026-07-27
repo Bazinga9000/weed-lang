@@ -35,6 +35,8 @@ library
                     , mtl
                     , containers
                     , discord-haskell
+                    , scientific
     exposed-modules: Prelude,
                      Eris.Commands.Core,
-                     Eris.Commands.Registration
+                     Eris.Commands.Registration,
+                     Eris.Commands.Arguments,
