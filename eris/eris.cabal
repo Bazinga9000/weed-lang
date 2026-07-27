@@ -40,3 +40,4 @@ library
                      Eris.Commands.Core,
                      Eris.Commands.Registration,
                      Eris.Commands.Arguments,
+                     Eris.Commands
