@@ -22,6 +22,10 @@
             basePackages = pkgs.haskell.packages.ghc910;
 
             packages = {
+              discord-haskell.source = fetchTarball {
+                url = "https://hackage.haskell.org/package/discord-haskell-1.19.0/discord-haskell-1.19.0.tar.gz";
+                sha256 = "sha256:149makdvavapcvrrs5k40bzbyrk03w5xnhmyqnzzxjgzjd2bcn46";
+              };
             };
             settings = {
             };
