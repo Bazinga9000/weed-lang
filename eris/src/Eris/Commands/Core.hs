@@ -4,10 +4,19 @@ import Discord.Interactions
 
 -- | The full representation of a slash command
 data SlashCommand = SlashCommand
-  { name :: Text,
-    registration :: Maybe CreateApplicationCommand,
-    handler :: Interaction -> Maybe OptionsData -> DiscordHandler ()
+  { scName :: Text,
+    scRegistration :: Maybe CreateApplicationCommand,
+    scHandler :: Interaction -> Maybe OptionsData -> DiscordHandler ()
   }
+
+name :: SlashCommand -> Text
+name = scName
+
+registration :: SlashCommand -> Maybe CreateApplicationCommand
+registration = scRegistration
+
+handler :: SlashCommand -> Interaction -> Maybe OptionsData -> DiscordHandler ()
+handler = scHandler
 
 -- | A parser that extracts values from Discord's interaction data.
 newtype OptParser a = OptParser { runOptParser :: Interaction -> [OptionDataValue] -> Either Text a }

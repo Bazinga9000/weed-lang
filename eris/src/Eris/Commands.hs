@@ -1,9 +1,18 @@
-module Eris.Commands (arg, buildCommand) where
+module Eris.Commands (
+    arg,
+    buildCommand,
+    SlashCommand,
+    name,
+    registration,
+    handler,
+    updateCommandRegistrations
+) where
 
 import Discord
 import Discord.Interactions
 import Discord.Requests qualified as R
 import Eris.Commands.Core
+import Eris.Commands.Registration
 import Eris.Commands.Arguments
 import Relude.Unsafe (fromJust)
 
@@ -22,10 +31,10 @@ getOptionName = \case
 
 -- | Defines a single argument for a command
 arg :: forall a. DiscordOption a => Text -> Text -> CommandDef a
-arg name desc = CommandDef [opt] (OptParser parser)
+arg argName argDesc = CommandDef [opt] (OptParser parser)
   where
-    opt = mkOption (Proxy @a) name desc
-    parser intr vals = parseOption intr (find (\v -> getOptionName v == name) vals)
+    opt = mkOption (Proxy @a) argName argDesc
+    parser intr vals = parseOption intr (find (\v -> getOptionName v == argName) vals)
 
 -- | Safely attaches options to a ChatInput command
 addOptions :: [OptionValue] -> CreateApplicationCommand -> CreateApplicationCommand
@@ -43,10 +52,10 @@ sendParseError intr msg = void . restCall $
 
 -- | Applicative builder for commands
 buildCommand :: Text -> Text -> CommandDef (Interaction -> DiscordHandler ()) -> SlashCommand
-buildCommand name desc (CommandDef opts (OptParser parser)) = SlashCommand
-  { name = name
-  , registration = Just $ addOptions opts (fromJust $ createChatInput name desc) --TODO: avoid the unsafe fromJust here
-  , handler = \intr mOpts -> do
+buildCommand commandName commandDesc (CommandDef opts (OptParser parser)) = SlashCommand
+  { scName = commandName
+  , scRegistration = Just $ addOptions opts (fromJust $ createChatInput commandName commandDesc) --TODO: avoid the unsafe fromJust here
+  , scHandler = \intr mOpts -> do
       let vals = case mOpts of
             Just (OptionsDataValues vs) -> vs
             _ -> []
