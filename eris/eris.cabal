@@ -43,4 +43,5 @@ library
                      Eris.Commands.Arguments,
                      Eris.Commands,
                      Eris.Token,
-                     Eris.Handler
+                     Eris.Handler,
+                     Eris
