@@ -44,4 +44,5 @@ library
                      Eris.Commands,
                      Eris.Token,
                      Eris.Handler,
+                     Eris.Output,
                      Eris
