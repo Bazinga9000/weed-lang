@@ -1,8 +1,16 @@
-module Eris (Eris(..), runEris) where
+module Eris (
+    Eris(..),
+    runEris,
+    ErisHandler,
+    SlashCommand,
+    arg,
+    buildCommand,
+    module Eris.Output) where
 
 import Eris.Commands
 import Eris.Token
 import Eris.Handler
+import Eris.Output
 import Discord
 import Discord.Interactions
 import Discord.Types
@@ -56,9 +64,9 @@ onInteractionCreate eris tvar cmd = case cmd of
     { applicationCommandData = input@ApplicationCommandDataChatInput {}
     } ->
       let inputName = applicationCommandDataName input
-       in case find (\c -> inputName == name c) (commands eris) of
+       in case find (\c -> inputName == scName c) (commands eris) of
             Just found ->
-              runErisHandler tvar $ handler found cmd (optionsData input)
+              runErisHandler tvar $ scHandler found cmd (optionsData input)
             Nothing ->
               bad $ "Got unknown slash command " <> inputName <> " (registrations out of date?)"
   _ ->

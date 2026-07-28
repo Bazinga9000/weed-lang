@@ -1,10 +1,7 @@
 module Eris.Commands (
     arg,
     buildCommand,
-    SlashCommand,
-    name,
-    registration,
-    handler,
+    SlashCommand(..),
     updateCommandRegistrations
 ) where
 
