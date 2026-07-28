@@ -14,6 +14,7 @@ import Discord.Requests qualified as R
 import Eris.Commands.Core
 import Eris.Commands.Registration
 import Eris.Commands.Arguments
+import Eris.Handler
 import Relude.Unsafe (fromJust)
 
 -- | Extracts the name from any Discord option payload
@@ -43,15 +44,15 @@ addOptions opts c@CreateApplicationCommandChatInput{} =
   c { createOptions = Just (OptionsValues opts) }
 addOptions _ c = c
 
-sendParseError :: Interaction -> Text -> DiscordHandler ()
-sendParseError intr msg = void . restCall $
+sendParseError :: Interaction -> Text -> ErisHandler s ()
+sendParseError intr msg = void . liftDiscord . restCall $
   R.CreateInteractionResponse
     (interactionId intr)
     (interactionToken intr)
     (interactionResponseBasic $ "Command Error: " <> msg)
 
 -- | Applicative builder for commands
-buildCommand :: Text -> Text -> CommandDef (Interaction -> DiscordHandler ()) -> SlashCommand
+buildCommand :: Text -> Text -> CommandDef (Interaction -> ErisHandler s ()) -> SlashCommand s
 buildCommand commandName commandDesc (CommandDef opts (OptParser parser)) = SlashCommand
   { scName = commandName
   , scRegistration = Just $ addOptions opts (fromJust $ createChatInput commandName commandDesc) --TODO: avoid the unsafe fromJust here

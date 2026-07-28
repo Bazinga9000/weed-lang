@@ -42,4 +42,5 @@ library
                      Eris.Commands.Registration,
                      Eris.Commands.Arguments,
                      Eris.Commands,
-                     Eris.Token
+                     Eris.Token,
+                     Eris.Handler

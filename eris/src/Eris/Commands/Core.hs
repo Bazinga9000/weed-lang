@@ -1,21 +1,21 @@
 module Eris.Commands.Core where
-import Discord
 import Discord.Interactions
+import Eris.Handler
 
 -- | The full representation of a slash command
-data SlashCommand = SlashCommand
+data SlashCommand s = SlashCommand
   { scName :: Text,
     scRegistration :: Maybe CreateApplicationCommand,
-    scHandler :: Interaction -> Maybe OptionsData -> DiscordHandler ()
+    scHandler :: Interaction -> Maybe OptionsData -> ErisHandler s ()
   }
 
-name :: SlashCommand -> Text
+name :: SlashCommand s -> Text
 name = scName
 
-registration :: SlashCommand -> Maybe CreateApplicationCommand
+registration :: SlashCommand s -> Maybe CreateApplicationCommand
 registration = scRegistration
 
-handler :: SlashCommand -> Interaction -> Maybe OptionsData -> DiscordHandler ()
+handler :: SlashCommand s -> Interaction -> Maybe OptionsData -> ErisHandler s ()
 handler = scHandler
 
 -- | A parser that extracts values from Discord's interaction data.

@@ -6,7 +6,7 @@ import Discord.Requests qualified as R
 import Discord.Types
 
 -- the full flow for updating a bot's application commands
-updateCommandRegistrations :: ApplicationId -> [SlashCommand] -> DiscordHandler ()
+updateCommandRegistrations :: ApplicationId -> [SlashCommand s] -> DiscordHandler ()
 updateCommandRegistrations appId commands = do
   echo "Registering commands..."
   regs <- mapM (register appId) commands
@@ -23,7 +23,7 @@ updateCommandRegistrations appId commands = do
 
 -- register an application command.
 -- Outputs status info on the registration to stdout
-register :: ApplicationId -> SlashCommand -> DiscordHandler (Maybe ApplicationCommand)
+register :: ApplicationId -> SlashCommand s -> DiscordHandler (Maybe ApplicationCommand)
 register appId cmd = do
   resp <- tryRegistering cmd
   case resp of
