@@ -16,16 +16,22 @@
       imports = [ inputs.haskell-flake.flakeModule ];
 
       perSystem =
-        { self', pkgs, ... }:
+        { self', pkgs, lib, ... }:
         {
-          haskellProjects.default = {
+          haskellProjects.default = rec {
             basePackages = pkgs.haskell.packages.ghc910;
 
             packages = {
-              discord-haskell.source = fetchTarball {
-                url = "https://hackage.haskell.org/package/discord-haskell-1.19.0/discord-haskell-1.19.0.tar.gz";
-                sha256 = "sha256:149makdvavapcvrrs5k40bzbyrk03w5xnhmyqnzzxjgzjd2bcn46";
-              };
+              discord-haskell.source =
+                let
+                  noOverride = lib.versionAtLeast basePackages.discord-haskell.version "1.19.0";
+                in
+                lib.warnIf noOverride
+                  "discord-haskell >= 1.19.0 is now present in nixpkgs. This override can be removed."
+                  (fetchTarball {
+                    url = "https://hackage.haskell.org/package/discord-haskell-1.19.0/discord-haskell-1.19.0.tar.gz";
+                    sha256 = "sha256:149makdvavapcvrrs5k40bzbyrk03w5xnhmyqnzzxjgzjd2bcn46";
+                  });
             };
             settings = {
             };
