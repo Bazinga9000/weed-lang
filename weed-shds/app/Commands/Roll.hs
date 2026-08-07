@@ -30,7 +30,7 @@ roll = buildCommand "roll" "Roll dice, backed by WEED." $
 
 rollHandler :: Text -> Interaction -> ErisHandler s ()
 rollHandler input intr = do
-  interpreted <- unwrapTimeout <$> liftIO (timeout 1_000_000_000 $ interpret input)
+  interpreted <- unwrapTimeout <$> liftIO (timeout 10_000_000 $ interpret input)
   let preamble = unwords [fetchUserName (interactionUser intr) <> "'s", "roll", "`" <> input <> "`"]
   let out =
         unlines
