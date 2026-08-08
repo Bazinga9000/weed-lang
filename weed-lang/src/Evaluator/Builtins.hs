@@ -140,7 +140,7 @@ runLiftMask t predicate = do
   -- TODO: we're being lazy here, and lying to LiftMask about the type
   -- so we don't have to investigate the selector. This will probably bite us
   -- later. Maybe write some nice wrapper around liftMask since it will get called in a lot of the builtin modifiers?
-  let liftMask = fetchBuiltin (selectorType ->> TApp TList TUnit ->> TApp TList TBool) LiftMask
+  let liftMask = fetchBuiltin (selectorType ->> TListOf TUnit ->> TListOf TBool) LiftMask
   applyValue liftMask predicate
 
 --- Construct the builtin for a modifier like reroll.
@@ -251,18 +251,18 @@ fetchBuiltin apt Ap = liftValue2 $ \mf ma -> do
   env <- ask
   t <- fetchOutputType2 apt
   case t of
-    (TApp TList _) -> do
+    (TListOf _) -> do
       lf <- assertList mf
       la <- assertList ma
       VList <$> sequenceDropList (fmap applyValue lf <*> la)
-    (TApp TDice _) -> do
+    (TDiceOf _) -> do
       df <- assertDice mf
       da <- assertDice ma
       return $ VDice $ do
         vf <- df
         va <- da
         applyValueRoll env vf va
-    (TApp TPool _) -> do
+    (TPoolOf _) -> do
       (poolf, sourcef) <- assertPool mf
       (poola, sourcea) <- assertPool ma
       return $
@@ -281,9 +281,9 @@ fetchBuiltin apt Ap = liftValue2 $ \mf ma -> do
 fetchBuiltin rett Return = VBuiltin $ \v -> do
   t <- fetchOutputType1 rett
   case t of
-    (TApp TDice _) -> return $ VDice $ return v
-    (TApp TList _) -> return $ VList $ one v
-    (TApp TPool _) -> return $ VPool (return . return $ v) (return v)
+    (TDiceOf _) -> return $ VDice $ return v
+    (TListOf _) -> return $ VList $ one v
+    (TPoolOf _) -> return $ VPool (return . return $ v) (return v)
     _ -> throwError $ InterpreterBug "Evaluator got an invalid type for return"
 fetchBuiltin _ Bind = liftValue2 $ \m f -> do
   env <- ask
@@ -326,8 +326,8 @@ fetchBuiltin _ Bind = liftValue2 $ \m f -> do
 fetchBuiltin t LiftMask =
   let getLiftMaskType :: WeedType -> Either EvaluationError Bool
       getLiftMaskType ty = case N.toList $ unwrapFunction ty of
-        [TFunction (TApp TList _) (TApp TList TBool), TApp TList _, TApp TList TBool] -> return True
-        [TFunction _ TBool, TApp TList _, TApp TList TBool] -> return False
+        [TFunction (TListOf _) (TListOf TBool), TListOf _, TListOf TBool] -> return True
+        [TFunction _ TBool, TListOf _, TListOf TBool] -> return False
         e -> throwError $ InterpreterBug $ "LiftMask input type was " <> prettyPrint ty <> " unwrapped as " <> prettyPrint e
    in case getLiftMaskType t of
         -- Just True: input is ([a] -> [Bool]), Just False: input is a -> Bool
@@ -350,13 +350,13 @@ fetchBuiltin _ Collapse = VBuiltin collapse
   where
     collapse :: Value -> Eval Value
     collapse (VPool pool _) = return $ VDice $ VNumber . sum . getKept <$> (pool >>= mapMDropList assertNumber)
-    collapse e = throwError $ TypeError (mkPool TNumber) e
+    collapse e = throwError $ TypeError (TPoolOf TNumber) e
 fetchBuiltin _ Source = VBuiltin source
   where
     source :: Value -> Eval Value
     source (VDice d) = return $ VDice d
     source (VPool _ s) = return $ VDice s
-    source e = throwError $ TypeError (mkPool TNumber) e -- again, this typeerror's type is morally wrong, but the typechecker should catch this
+    source e = throwError $ TypeError (TPoolOf TNumber) e -- again, this typeerror's type is morally wrong, but the typechecker should catch this
 fetchBuiltin _ Poolify = liftValue2 poolify
   where
     poolify :: Value -> Value -> Eval Value
@@ -368,7 +368,7 @@ fetchBuiltin _ Poolify = liftValue2 poolify
           if count == 0
             then throwError $ BadDieParameter Poolify "expected a positive number of dice" v
             else return $ VPool (replicateMDropList count d) d
-    poolify (VNumber _) e = throwError $ TypeError (mkDice TNumber) e
+    poolify (VNumber _) e = throwError $ TypeError (TPoolOf TNumber) e
     poolify n _ = throwError $ TypeError TNumber n
 fetchBuiltin _ Sum = VBuiltin $ \xs -> do
   xs' <- assertList xs

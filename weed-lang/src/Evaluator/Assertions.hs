@@ -35,7 +35,7 @@ assertPositiveReal = assertRealPredicate (> 0)
 
 assertList :: (MonadError EvaluationError m) => Value -> m (DropList Value)
 assertList (VList xs) = return xs
-assertList e = throwError $ TypeError (mkList TUnit) e -- expected type is morally wrong, but this should never happen
+assertList e = throwError $ TypeError (TListOf TUnit) e -- expected type is morally wrong, but this should never happen
 
 assertNonEmptyList :: (MonadError EvaluationError m) => Value -> m (NonEmpty (DropItem Value))
 assertNonEmptyList v = do

@@ -39,6 +39,18 @@ data WeedType
   | TApp WeedType WeedType -- a b
   deriving (Show, Eq, Ord)
 
+pattern TListOf :: WeedType -> WeedType
+pattern TListOf t = TApp TList t
+
+pattern TDiceOf :: WeedType -> WeedType
+pattern TDiceOf t = TApp TDice t
+
+pattern TPoolOf :: WeedType -> WeedType
+pattern TPoolOf t = TApp TPool t
+
+pattern (:->>) :: WeedType -> WeedType -> WeedType
+pattern a :->> b = TFunction a b
+
 baseType :: WeedType -> WeedType
 baseType (TApp t _) = baseType t
 baseType t = t
@@ -49,19 +61,10 @@ infixr 0 ->>
 (->>) :: WeedType -> WeedType -> WeedType
 (->>) = TFunction
 
-mkList :: WeedType -> WeedType
-mkList = TApp TList
-
-mkDice :: WeedType -> WeedType
-mkDice = TApp TDice
-
-mkPool :: WeedType -> WeedType
-mkPool = TApp TPool
-
 isDiceOrPool :: WeedType -> Bool
 isDiceOrPool t = case t of
-  TApp TDice _ -> True
-  TApp TPool _ -> True
+  TDiceOf _ -> True
+  TPoolOf _ -> True
   _ -> False
 
 data WeedTypeScheme = ForAll [TypeVarName] [TypeConstraint] WeedType
@@ -70,11 +73,11 @@ data WeedTypeScheme = ForAll [TypeVarName] [TypeConstraint] WeedType
 data ContextLvl = CtxBase | CtxDice | CtxPool deriving (Eq, Ord, Show)
 
 peelEffect :: WeedType -> (ContextLvl, WeedType)
-peelEffect (TApp TPool t) = (CtxPool, t)
-peelEffect (TApp TDice t) = (CtxDice, t)
+peelEffect (TPoolOf t) = (CtxPool, t)
+peelEffect (TDiceOf t) = (CtxDice, t)
 peelEffect t = (CtxBase, t)
 
 applyEffect :: ContextLvl -> WeedType -> WeedType
-applyEffect CtxPool t = TApp TPool t
-applyEffect CtxDice t = TApp TDice t
+applyEffect CtxPool t = TPoolOf t
+applyEffect CtxDice t = TDiceOf t
 applyEffect CtxBase t = t

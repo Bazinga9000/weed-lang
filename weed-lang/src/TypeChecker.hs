@@ -38,14 +38,14 @@ infer (CUBool b) = return (TBool, CTBool b)
 infer CUUnit = return (TUnit, CTUnit)
 infer (CUList []) = do
   t <- fresh
-  return (mkList t, CTList t [])
+  return (TListOf t, CTList t [])
 infer (CUList (x : xs)) = do
   t <- fresh
   (tx, cx) <- infer x
   (txs, cxs) <- infer (CUList xs)
   unify t tx
-  unify (mkList t) txs
-  let listType = mkList t
+  unify (TListOf t) txs
+  let listType = TListOf t
   newList <- CTList listType <$> appendCList cx cxs
   return (listType, newList)
   where
@@ -83,7 +83,7 @@ infer (CUApply f arg) = do
             TFunction texp tret ->
               [ -- Pool Mapping
                 case (texp, ta') of
-                  (TApp TList texpInner, TApp TPool taInner) -> do
+                  (TListOf texpInner, TPoolOf taInner) -> do
                     -- check the unification without actually doing it
                     ok <- unifyPeek texpInner taInner
                     if ok
@@ -98,14 +98,14 @@ infer (CUApply f arg) = do
                   _ -> return Nothing,
                 -- Pool Collapse (Direct)
                 case (texp, ta') of
-                  (TApp TDice TNumber, TApp TPool TNumber) -> do
+                  (TDiceOf TNumber, TPoolOf TNumber) -> do
                     unify tret tr
                     (_, collapseCall) <- call1 Collapse ta' ca
                     return $ Just (tret, CTApply tret cf collapseCall)
                   _ -> return Nothing,
                 -- Pool Collapse (Indirect)
                 case (texp, ta') of
-                  (TNumber, TApp TPool TNumber) -> do
+                  (TNumber, TPoolOf TNumber) -> do
                     (tCollapsed, collapseCall) <- call1 Collapse ta' ca
                     -- immediately wrap in an fmap
                     (tFMapped, fmapCall) <- call2 Map tf' cf tCollapsed collapseCall
@@ -148,7 +148,7 @@ infer (CUApply f arg) = do
                 -- but for ease of comprehension we write the general
                 -- case
                 case (tWrapper, ta') of
-                  (TDice, TApp TPool taActual) -> do
+                  (TDice, TPoolOf taActual) -> do
                     ok <- unifyPeek taInner taActual
                     if ok
                       then do
@@ -328,7 +328,7 @@ solve finalSubst constraints =
             bt -> if bt `elem` ts then Right () else Left $ MissingInstance cls
 
           isNestedListOf :: WeedType -> [WeedType] -> Either TypeError ()
-          isNestedListOf (TApp TList t) ts = isNestedListOf t ts
+          isNestedListOf (TListOf t) ts = isNestedListOf t ts
           isNestedListOf (TApp _ _) _ = Left $ MissingInstance cls
           isNestedListOf t ts = if t `elem` ts then Right () else Left $ MissingInstance cls
 
@@ -339,7 +339,7 @@ solve finalSubst constraints =
             (CSelector a s) ->
               case s of
                 TFunction a' TBool | a == a' -> Right ()
-                TFunction (TApp TList a') (TApp TList TBool) | a == a' -> Right ()
+                TFunction (TListOf a') (TListOf TBool) | a == a' -> Right ()
                 TVar tv -> Left $ AmbiguousTypeVar tv cls
                 _ -> Left $ MissingInstance cls
             (CEq t) -> isNestedListOf t [TNumber, TBool, TUnit]
