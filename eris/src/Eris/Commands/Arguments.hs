@@ -69,7 +69,7 @@ instance DiscordOption RoleId where
 
 
 instance DiscordOption Role where
-  mkOption _ name desc = OptionValueUser
+  mkOption _ name desc = OptionValueRole
     name Nothing desc Nothing True
 
   parseOption intr (Just (OptionDataValueRole _ r)) = fetch intr resolvedDataRoles r
@@ -110,7 +110,7 @@ instance DiscordOption Double where
 
 
 instance DiscordOption Attachment where
-  mkOption _ name desc = OptionValueUser
+  mkOption _ name desc = OptionValueAttachment
     name Nothing desc Nothing True
 
   parseOption intr (Just (OptionDataValueAttachment _ a)) = fetch intr resolvedDataAttachments (DiscordId a)
