@@ -28,7 +28,7 @@ common shared-config
     mixins:
         base hiding (Prelude)
 
-executable weed
+executable weed-shds
     import:           shared-config
     main-is:          Main.hs
     hs-source-dirs:   app
