@@ -91,8 +91,7 @@ u :: Value
 u = wrapOne (DiceD, "a positive real") assertPositiveReal uCore
   where
     uCore i =
-      return . VDice . liftGen $
-        VNumber . noCritFail . noCrit . blank . D <$> choose (0.0, i)
+      VNumber . noCritFail . noCrit . blank . D <$> choose (0.0, i)
 
 -- gaussian die
 -- samples a gaussian with mean 0 and stdev sigma
