@@ -69,7 +69,7 @@ s = wrapOne (DiceS, "a non-empty list") assertNonEmptyList sCore
 -- crits on: bound
 -- fails on: -bound
 f :: Value
-f = wrapOne (DiceD, "a natural number") assertNatural fCore
+f = wrapOne (DiceF, "a natural number") assertNatural fCore
   where
     fCore :: Natural -> Gen Value
     fCore bound = do
@@ -88,7 +88,7 @@ f = wrapOne (DiceD, "a natural number") assertNatural fCore
 -- samples a uniform double from the interval (0, i)
 -- never crits nor fails
 u :: Value
-u = wrapOne (DiceD, "a positive real") assertPositiveReal uCore
+u = wrapOne (DiceU, "a positive real") assertPositiveReal uCore
   where
     uCore i =
       VNumber . noCritFail . noCrit . blank . D <$> choose (0.0, i)
