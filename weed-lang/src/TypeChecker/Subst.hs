@@ -60,7 +60,7 @@ instance Substitutable WeedType where
 
 instance Substitutable WeedTypeScheme where
   apply s (ForAll vars cs t) = ForAll vars (apply s cs) (apply s t)
-  ftv (ForAll vars cs t) = ftv t `Set.difference` (ftv cs `Set.union` Set.fromList vars)
+  ftv (ForAll vars cs t) = (ftv t `Set.union` ftv cs) `Set.difference` Set.fromList vars
 
 instance (Substitutable a, Functor f, Foldable f) => Substitutable (f a) where
   apply s = fmap (apply s)
