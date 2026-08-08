@@ -26,10 +26,10 @@ any1 = do
   return $ ForAll [tv] [] (TVar tv ->> TVar tv)
 
 dice1 :: Infer WeedTypeScheme
-dice1 = return $ noPoly (TNumber ->> TDiceOf TNumber)
+dice1 = return $ noPoly (TNumber ->> TDice TNumber)
 
 dice2 :: Infer WeedTypeScheme
-dice2 = return $ noPoly (TNumber ->> TNumber ->> TDiceOf TNumber)
+dice2 = return $ noPoly (TNumber ->> TNumber ->> TDice TNumber)
 
 eqCmp :: Infer WeedTypeScheme
 eqCmp = do
@@ -88,7 +88,7 @@ builtinType MapP = do
   b <- fresh
   let ta = TVar a
   let tb = TVar b
-  return $ ForAll [a, b] [] ((TListOf ta ->> tb) ->> TPoolOf ta ->> TDiceOf tb)
+  return $ ForAll [a, b] [] ((TList ta ->> tb) ->> TPool ta ->> TDice tb)
 builtinType Ap = do
   m <- fresh
   a <- fresh
@@ -116,32 +116,32 @@ builtinType LiftMask = do
   a <- fresh
   let ts = TVar s
   let ta = TVar a
-  return $ ForAll [s, a] [CInstanceOf $ CSelector ta ts] (ts ->> TListOf ta ->> TListOf TBool)
+  return $ ForAll [s, a] [CInstanceOf $ CSelector ta ts] (ts ->> TList ta ->> TList TBool)
 builtinType DiceD = dice1
 builtinType DiceS = do
   tv <- fresh
-  return $ ForAll [tv] [] (TListOf (TVar tv) ->> TDiceOf (TVar tv))
+  return $ ForAll [tv] [] (TList (TVar tv) ->> TDice (TVar tv))
 builtinType DiceF = dice1
 builtinType DiceU = dice1
 builtinType DiceGauss = dice1
 builtinType DicePareto = dice1
 builtinType DiceBinomial = dice2
-builtinType DiceCoin = return $ noPoly $ TDiceOf TBool
+builtinType DiceCoin = return $ noPoly $ TDice TBool
 builtinType DiceCircle = dice1
 builtinType Constant = do
   tv <- fresh
-  return $ ForAll [tv] [] (TVar tv ->> TDiceOf (TVar tv))
-builtinType Collapse = return $ noPoly (TPoolOf TNumber ->> TDiceOf TNumber)
+  return $ ForAll [tv] [] (TVar tv ->> TDice (TVar tv))
+builtinType Collapse = return $ noPoly (TPool TNumber ->> TDice TNumber)
 builtinType Source = do
   f <- fresh
   a <- fresh
   let tf = TVar f
       ta = TVar a
-  return $ ForAll [f, a] [CInstanceOf $ CRollable tf] (TApp tf ta ->> TDiceOf tf)
+  return $ ForAll [f, a] [CInstanceOf $ CRollable tf] (TApp tf ta ->> TDice tf)
 builtinType Poolify = do
   tv <- fresh
-  return $ ForAll [tv] [] (TNumber ->> TDiceOf (TVar tv) ->> TPoolOf (TVar tv))
-builtinType Sum = return $ noPoly (TListOf TNumber ->> TNumber)
+  return $ ForAll [tv] [] (TNumber ->> TDice (TVar tv) ->> TPool (TVar tv))
+builtinType Sum = return $ noPoly (TList TNumber ->> TNumber)
 builtinType Keep = predicateMapModifier
 builtinType Drop = predicateMapModifier
 builtinType Explode = do
@@ -149,11 +149,11 @@ builtinType Explode = do
   r <- fresh
   let ta = TVar a
       tr = TVar r
-  return $ ForAll [a, r] [CInstanceOf $ CRollable tr] ((ta ->> TBool) ->> TApp tr ta ->> TPoolOf ta)
+  return $ ForAll [a, r] [CInstanceOf $ CRollable tr] ((ta ->> TBool) ->> TApp tr ta ->> TPool ta)
 builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
-builtinType Highest = return $ noPoly (TNumber ->> TListOf TNumber ->> TListOf TBool)
-builtinType Lowest = return $ noPoly (TNumber ->> TListOf TNumber ->> TListOf TBool)
+builtinType Highest = return $ noPoly (TNumber ->> TList TNumber ->> TList TBool)
+builtinType Lowest = return $ noPoly (TNumber ->> TList TNumber ->> TList TBool)
 builtinType Length = do
   a <- fresh
   let ta = TVar a
-  return $ ForAll [a] [] (TListOf ta ->> TNumber)
+  return $ ForAll [a] [] (TList ta ->> TNumber)

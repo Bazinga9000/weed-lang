@@ -36,12 +36,9 @@ instance Pretty WeedType where
   prettyPrint TBool = "𝔹"
   prettyPrint TUnit = "()"
   prettyPrint (TFunction t1 t2) = "(" <> prettyPrint t1 <> " -> " <> prettyPrint t2 <> ")"
-  prettyPrint (TListOf t) = "[" <> prettyPrint t <> "]"
-  prettyPrint (TDiceOf t) = "(Dice " <> prettyPrint t <> ")"
-  prettyPrint (TPoolOf t) = "(Pool " <> prettyPrint t <> ")"
-  prettyPrint TList = "[]"
-  prettyPrint TDice = "Dice"
-  prettyPrint TPool = "Pool"
+  prettyPrint (TList t) = "[" <> prettyPrint t <> "]"
+  prettyPrint (TDice t) = "(Dice " <> prettyPrint t <> ")"
+  prettyPrint (TPool t) = "(Pool " <> prettyPrint t <> ")"
   prettyPrint (TVar n) = prettyPrint n
   prettyPrint (TApp t1 t2) = "(" <> prettyPrint t1 <> " " <> prettyPrint t2 <> ")"
 

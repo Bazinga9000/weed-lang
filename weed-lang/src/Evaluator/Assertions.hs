@@ -35,7 +35,7 @@ assertPositiveReal = assertRealPredicate (> 0)
 
 assertList :: (MonadError EvaluationError m) => Value -> m (DropList Value)
 assertList (VList xs) = return xs
-assertList e = throwError $ TypeError (TListOf TUnit) e -- expected type is morally wrong, but this should never happen
+assertList e = throwError $ TypeError (TList TUnit) e -- expected type is morally wrong, but this should never happen
 
 assertNonEmptyList :: (MonadError EvaluationError m) => Value -> m (NonEmpty (DropItem Value))
 assertNonEmptyList v = do
@@ -46,11 +46,11 @@ assertNonEmptyList v = do
 
 assertDice :: (MonadError EvaluationError m) => Value -> m (Roll Value)
 assertDice (VDice r) = return r
-assertDice e = throwError $ TypeError TDice e
+assertDice e = throwError $ TypeError (TDice TUnit) e -- expected type is morally wrong, but this should never happen
 
 assertPool :: (MonadError EvaluationError m) => Value -> m (Roll (DropList Value), Roll Value)
 assertPool (VPool r s) = return (r, s)
-assertPool e = throwError $ TypeError TPool e
+assertPool e = throwError $ TypeError (TPool TUnit) e -- expected type is morally wrong, but this should never happen
 
 assertNatural :: (MonadError EvaluationError m) => Value -> m Natural
 assertNatural (VNumber wn) = case tnIntoNatural (wn ^. value) of

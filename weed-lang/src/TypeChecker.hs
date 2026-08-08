@@ -38,14 +38,14 @@ infer (CUBool b) = return (TBool, CTBool b)
 infer CUUnit = return (TUnit, CTUnit)
 infer (CUList []) = do
   t <- fresh
-  return (TListOf t, CTList t [])
+  return (TList t, CTList t [])
 infer (CUList (x : xs)) = do
   t <- fresh
   (tx, cx) <- infer x
   (txs, cxs) <- infer (CUList xs)
   unify t tx
-  unify (TListOf t) txs
-  let listType = TListOf t
+  unify (TList t) txs
+  let listType = TList t
   newList <- CTList listType <$> appendCList cx cxs
   return (listType, newList)
   where
@@ -83,7 +83,7 @@ infer (CUApply f arg) = do
             TFunction texp tret ->
               [ -- Pool Mapping
                 case (texp, ta') of
-                  (TListOf texpInner, TPoolOf taInner) -> do
+                  (TList texpInner, TPool taInner) -> do
                     -- check the unification without actually doing it
                     ok <- unifyPeek texpInner taInner
                     if ok
@@ -98,14 +98,14 @@ infer (CUApply f arg) = do
                   _ -> return Nothing,
                 -- Pool Collapse (Direct)
                 case (texp, ta') of
-                  (TDiceOf TNumber, TPoolOf TNumber) -> do
+                  (TDice TNumber, TPool TNumber) -> do
                     unify tret tr
                     (_, collapseCall) <- call1 Collapse ta' ca
                     return $ Just (tret, CTApply tret cf collapseCall)
                   _ -> return Nothing,
                 -- Pool Collapse (Indirect)
                 case (texp, ta') of
-                  (TNumber, TPoolOf TNumber) -> do
+                  (TNumber, TPool TNumber) -> do
                     (tCollapsed, collapseCall) <- call1 Collapse ta' ca
                     -- immediately wrap in an fmap
                     (tFMapped, fmapCall) <- call2 Map tf' cf tCollapsed collapseCall
@@ -114,7 +114,7 @@ infer (CUApply f arg) = do
                   _ -> return Nothing,
                 -- Implicit map
                 case ta' of
-                  TApp tWrapper taInner -> do
+                  TApplied tWrapper taInner -> do
                     ok <- unifyPeek texp taInner
                     if ok
                       then do
@@ -127,7 +127,7 @@ infer (CUApply f arg) = do
                   _ -> return Nothing,
                 -- Scalar Promotion (Direct)
                 case texp of
-                  TApp tWrapper texpInner | not (isDiceOrPool ta') -> do
+                  TApplied tWrapper texpInner | not (isDiceOrPool ta') -> do
                     ok <- unifyPeek texpInner ta'
                     if ok
                       then do
@@ -141,14 +141,14 @@ infer (CUApply f arg) = do
                   _ -> return Nothing
               ]
             -- f :: m (a -> b) is wrapped
-            TApp tWrapper (TFunction taInner _) ->
+            TApplied tWrapper (TFunction taInner _) ->
               [ -- Pool Collapse (Applicative)
                 -- f is Dice (a -> b), arg is Pool a
                 -- this fails to typecheck if a != Number
                 -- but for ease of comprehension we write the general
                 -- case
                 case (tWrapper, ta') of
-                  (TDice, TPoolOf taActual) -> do
+                  (TDice _, TPool taActual) -> do
                     ok <- unifyPeek taInner taActual
                     if ok
                       then do
@@ -162,7 +162,7 @@ infer (CUApply f arg) = do
                   _ -> return Nothing,
                 -- Implicit Applicative <*>
                 case ta' of
-                  TApp targWrapper taActual -> do
+                  TApplied targWrapper taActual -> do
                     ok <- unifyPeek taInner taActual
                     ok2 <- unifyPeek tWrapper targWrapper
                     if ok && ok2
@@ -322,24 +322,26 @@ solve finalSubst constraints =
   mapM_ solveOne $ apply finalSubst constraints
   where
     solveOne (CInstanceOf cls) =
-      let baseTypeOneOf :: WeedType -> [WeedType] -> Either TypeError ()
-          baseTypeOneOf t ts = case baseType t of
+      let baseTypeOneOf :: WeedType -> [TypeHead] -> Either TypeError ()
+          baseTypeOneOf t ts = case t of
             (TVar tv) -> Left $ AmbiguousTypeVar tv cls
-            bt -> if bt `elem` ts then Right () else Left $ MissingInstance cls
+            _ -> case baseType t of
+              Just bt | bt `elem` ts -> Right ()
+              _ -> Left $ MissingInstance cls
 
           isNestedListOf :: WeedType -> [WeedType] -> Either TypeError ()
-          isNestedListOf (TListOf t) ts = isNestedListOf t ts
+          isNestedListOf (TList t) ts = isNestedListOf t ts
           isNestedListOf (TApp _ _) _ = Left $ MissingInstance cls
           isNestedListOf t ts = if t `elem` ts then Right () else Left $ MissingInstance cls
 
        in case cls of
-            (CFunctor t) -> baseTypeOneOf t [TList, TDice, TPool]
-            (CMonad t) -> baseTypeOneOf t [TList, TDice, TPool]
-            (CRollable t) -> baseTypeOneOf t [TDice, TPool]
+            (CFunctor t) -> baseTypeOneOf t [HList, HDice, HPool]
+            (CMonad t) -> baseTypeOneOf t [HList, HDice, HPool]
+            (CRollable t) -> baseTypeOneOf t [HDice, HPool]
             (CSelector a s) ->
               case s of
                 TFunction a' TBool | a == a' -> Right ()
-                TFunction (TListOf a') (TListOf TBool) | a == a' -> Right ()
+                TFunction (TList a') (TList TBool) | a == a' -> Right ()
                 TVar tv -> Left $ AmbiguousTypeVar tv cls
                 _ -> Left $ MissingInstance cls
             (CEq t) -> isNestedListOf t [TNumber, TBool, TUnit]

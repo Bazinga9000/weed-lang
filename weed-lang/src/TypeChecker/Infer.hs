@@ -81,14 +81,33 @@ unify' t (TVar n) = bind n t
 unify' TNumber TNumber = return nullSubst
 unify' TBool TBool = return nullSubst
 unify' TUnit TUnit = return nullSubst
-unify' TList TList = return nullSubst
-unify' TDice TDice = return nullSubst
-unify' TPool TPool = return nullSubst
+unify' (TList a) (TList b) = unify' a b
+unify' (TDice a) (TDice b) = unify' a b
+unify' (TPool a) (TPool b) = unify' a b
+-- A TApp spine whose head is a type variable unifies with an applied
+-- constructor by binding the variable to the (real) constructor and
+-- unifying the arguments. This is what lets constraints quantify over
+-- type constructors, e.g. map :: CFunctor f => (a -> b) -> f a -> f b
+-- unifying f a ~ Dice Number binds f := Dice.
+unify' (TApp (TVar f) a) (TList b) = bindCtor f TList a b
+unify' (TApp (TVar f) a) (TDice b) = bindCtor f TDice a b
+unify' (TApp (TVar f) a) (TPool b) = bindCtor f TPool a b
+unify' (TList a) (TApp (TVar f) b) = bindCtor f TList a b
+unify' (TDice a) (TApp (TVar f) b) = bindCtor f TDice a b
+unify' (TPool a) (TApp (TVar f) b) = bindCtor f TPool a b
 unify' (TApp a b) (TApp a' b') = do
   s1 <- unify' a a'
   s2 <- unify' (apply s1 b) (apply s1 b')
   return $ s2 `compose` s1
 unify' t1' t2' = throwError $ CouldNotUnify t1' t2'
+
+-- bind a constructor variable to a real constructor (applied to a dummy
+-- argument that 'apply' contracts away) and unify the payloads
+bindCtor :: TypeVarName -> (WeedType -> WeedType) -> WeedType -> WeedType -> Either TypeError Subst
+bindCtor f ctor a b = do
+  s1 <- bind f (ctor TDummyArg)
+  s2 <- unify' (apply s1 a) (apply s1 b)
+  return $ s2 `compose` s1
 
 unify :: WeedType -> WeedType -> Infer ()
 unify t1 t2 = do

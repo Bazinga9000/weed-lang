@@ -28,32 +28,46 @@ newtype TypeConstraint = CInstanceOf WeedTypeClass
   deriving (Show)
 
 data WeedType
-  = TNumber
-  | TBool
-  | TUnit -- ()
-  | TFunction WeedType WeedType -- a -> b
-  | TList -- []
-  | TDice -- Dice a
-  | TPool -- Pool a
-  | TVar TypeVarName -- a type variable
-  | TApp WeedType WeedType -- a b
-  deriving (Show, Eq, Ord)
+  = TNumber | TBool | TUnit
+  | TFunction WeedType WeedType
+  | TList WeedType
+  | TDice WeedType
+  | TPool WeedType
+  | TVar TypeVarName
+  | TApp WeedType WeedType deriving (Show, Eq, Ord)
 
-pattern TListOf :: WeedType -> WeedType
-pattern TListOf t = TApp TList t
+-- | The head of a (possibly applied) type constructor.
+data TypeHead = HList | HDice | HPool deriving (Show, Eq, Ord)
 
-pattern TDiceOf :: WeedType -> WeedType
-pattern TDiceOf t = TApp TDice t
+-- | Dummy argument standing in for a constructor's parameter when a
+-- constructor variable is bound, e.g. f := TList TDummyArg. 'apply'
+-- contracts TApp (ctor TDummyArg) a back to ctor a, so the dummy never
+-- escapes substitution; it is only ever observed by 'baseType'.
+pattern TDummyArg :: WeedType
+pattern TDummyArg = TApp TUnit TUnit
 
-pattern TPoolOf :: WeedType -> WeedType
-pattern TPoolOf t = TApp TPool t
+-- | View a type as a constructor application: TList a, TDice a, TPool a
+-- and TApp f a all view as Just (f, a). Used by the coercion rules, which
+-- need to see "wrapped" types uniformly regardless of representation.
+viewApp :: WeedType -> Maybe (WeedType, WeedType)
+viewApp (TApp f a) = Just (f, a)
+viewApp (TList a) = Just (TList TDummyArg, a)
+viewApp (TDice a) = Just (TDice TDummyArg, a)
+viewApp (TPool a) = Just (TPool TDummyArg, a)
+viewApp _ = Nothing
+
+pattern TApplied :: WeedType -> WeedType -> WeedType
+pattern TApplied f a <- (viewApp -> Just (f, a))
 
 pattern (:->>) :: WeedType -> WeedType -> WeedType
 pattern a :->> b = TFunction a b
 
-baseType :: WeedType -> WeedType
+baseType :: WeedType -> Maybe TypeHead
 baseType (TApp t _) = baseType t
-baseType t = t
+baseType (TList _) = Just HList
+baseType (TDice _) = Just HDice
+baseType (TPool _) = Just HPool
+baseType _ = Nothing
 
 -- helpers for type construction
 infixr 0 ->>
@@ -63,8 +77,8 @@ infixr 0 ->>
 
 isDiceOrPool :: WeedType -> Bool
 isDiceOrPool t = case t of
-  TDiceOf _ -> True
-  TPoolOf _ -> True
+  TDice _ -> True
+  TPool _ -> True
   _ -> False
 
 data WeedTypeScheme = ForAll [TypeVarName] [TypeConstraint] WeedType
@@ -73,11 +87,11 @@ data WeedTypeScheme = ForAll [TypeVarName] [TypeConstraint] WeedType
 data ContextLvl = CtxBase | CtxDice | CtxPool deriving (Eq, Ord, Show)
 
 peelEffect :: WeedType -> (ContextLvl, WeedType)
-peelEffect (TPoolOf t) = (CtxPool, t)
-peelEffect (TDiceOf t) = (CtxDice, t)
+peelEffect (TPool t) = (CtxPool, t)
+peelEffect (TDice t) = (CtxDice, t)
 peelEffect t = (CtxBase, t)
 
 applyEffect :: ContextLvl -> WeedType -> WeedType
-applyEffect CtxPool t = TPoolOf t
-applyEffect CtxDice t = TDiceOf t
+applyEffect CtxPool t = TPool t
+applyEffect CtxDice t = TDice t
 applyEffect CtxBase t = t

@@ -20,6 +20,7 @@ common shared-config
         TemplateHaskell
         TypeFamilies
         PatternSynonyms
+        ViewPatterns
     build-depends:
         base >= 4.14 && < 5,
         relude,
@@ -47,6 +48,7 @@ library
                     , TypeChecker.Subst
                     , TypeChecker.BuiltinTypes
                     , TypeChecker.Infer
+                    , TypeChecker.Singletons
                     , Evaluator
                     , Evaluator.Types
                     , Evaluator.Assertions
