@@ -1,7 +1,7 @@
 module Eris.Handler (ErisHandler(..), runErisHandler, liftDiscord, MonadBotState(..)) where
 
 import Discord
-import Control.Monad.Reader
+import Control.Monad.Reader (mapReaderT)
 
 
 -- discord-haskell prefers using TVars or similar to handle state throughout commands

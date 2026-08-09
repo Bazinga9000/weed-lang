@@ -28,7 +28,7 @@ runEris eris = do
   token <- fetchToken
 
   echo "Initializing State..."
-  stateTVar <- (initState eris) >>= newTVarIO
+  stateTVar <- initState eris >>= newTVarIO
 
   echo "Starting Bot..."
 
