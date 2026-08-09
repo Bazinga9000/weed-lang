@@ -59,9 +59,6 @@ viewApp _ = Nothing
 pattern TApplied :: WeedType -> WeedType -> WeedType
 pattern TApplied f a <- (viewApp -> Just (f, a))
 
-pattern (:->>) :: WeedType -> WeedType -> WeedType
-pattern a :->> b = TFunction a b
-
 baseType :: WeedType -> Maybe TypeHead
 baseType (TApp t _) = baseType t
 baseType (TList _) = Just HList

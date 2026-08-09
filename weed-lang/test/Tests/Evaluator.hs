@@ -8,16 +8,18 @@ import Evaluator.DropList
 import Formatting.Pretty (prettyPrint)
 import Test.Tasty
 import Test.Tasty.HUnit
+import TypeChecker.Singletons (SWeedType (..))
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
 
-eqObservable :: Value -> Value -> Bool
-eqObservable (VNumber a) (VNumber b) = a =~= b
-eqObservable (VBool a) (VBool b) = a == b
-eqObservable VUnit VUnit = True
-eqObservable (VList as) (VList bs) = length as' == length bs' && and (zipWith eqObservable as' bs') where
+eqObservable :: SomeValue -> SomeValue -> Bool
+eqObservable (SomeValue _ (VNumber a)) (SomeValue _ (VNumber b)) = a =~= b
+eqObservable (SomeValue _ (VBool a)) (SomeValue _ (VBool b)) = a == b
+eqObservable (SomeValue _ VUnit) (SomeValue _ VUnit) = True
+eqObservable (SomeValue (STList sa) (VList as)) (SomeValue (STList sb) (VList bs)) = length as' == length bs' && and (zipWith eqItem as' bs') where
   as' = getKept as
   bs' = getKept bs
+  eqItem a b = eqObservable (SomeValue sa a) (SomeValue sb b)
 eqObservable _ _ = False
 
 -- eqError :: EvaluationError -> EvaluationError -> Bool
@@ -27,7 +29,7 @@ eqObservable _ _ = False
 -- eqError (DomainError b1) (DomainError b2) = b1 == b2
 -- eqError _ _ = False
 
-assertEval :: CoreTypedExpr -> Value -> Assertion
+assertEval :: CoreTypedExpr -> SomeValue -> Assertion
 assertEval expr expected = case evalPreSample expr of
   Right actual ->
     if actual `eqObservable` expected
@@ -41,8 +43,14 @@ assertNoError expr = case evalPreSample expr of
   Right _ -> pass
   Left err -> (assertFailure . toString) (prettyPrint err)
 
-vNum :: Integer -> Value
-vNum n = VNumber (literal $ fromInteger n)
+vNum :: Integer -> SomeValue
+vNum n = SomeValue STNumber (VNumber (literal $ fromInteger n))
+
+vBool :: Bool -> SomeValue
+vBool b = SomeValue STBool (VBool b)
+
+vList :: SWeedType a -> [Value a] -> SomeValue
+vList s xs = SomeValue (STList s) (VList $ toDropList xs)
 
 cNum :: Integer -> CoreTypedExpr
 cNum n = CTNumber (fromInteger n)
@@ -77,7 +85,7 @@ idX = S "x"
 mkHiLoTest :: Builtin -> String -> [Integer] -> [Bool] -> Integer -> TestTree
 mkHiLoTest hiLo name input output n = testCase name $ do
   let listArgs = CTList tListNum (map cNum input)
-  let expected = VList (VBool <$> toDropList output)
+  let expected = vList STBool (map VBool output)
   let predicateT = tListNum ->> TList TBool
   let builtinT = TNumber ->> predicateT
   let expr = CTApply (TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs
@@ -92,13 +100,13 @@ evaluatorTests =
         [ testCase "return 5 -> [5] (return explicitly typed as Number -> List Number)" $ do
             let returnE = CTIdentifier (tNum ->> tListNum) (B Return)
             let expr = CTApply tListNum returnE (cNum 5)
-            assertEval expr (VList $ toDropList [vNum 5]),
+            assertEval expr (vList STNumber [VNumber (literal 5)]),
           testCase "fmap (const 99) [1, 2] -> [99, 99]" $ do
             let listArg = CTList tListNum [cNum 1, cNum 2]
             let mapFunc = CTLambda (TFunction TNumber TNumber) idX (cNum 99)
             let mapE = CTIdentifier ((tNum ->> tNum) ->> tListNum ->> tListNum) (B Map)
             let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) mapE mapFunc) listArg
-            assertEval expr (VList $ toDropList [vNum 99, vNum 99]),
+            assertEval expr (vList STNumber [VNumber (literal 99), VNumber (literal 99)]),
           testCase "[const 8, const 9] <*> [1, 2] -> [8, 8, 9, 9]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
 
@@ -110,7 +118,7 @@ evaluatorTests =
 
             let apE = CTIdentifier (lFuncT ->> tListNum ->> tListNum) (B Ap)
             let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) apE listFuncs) listArgs
-            assertEval expr (VList $ toDropList [vNum 8, vNum 8, vNum 9, vNum 9]),
+            assertEval expr (vList STNumber [VNumber (literal 8), VNumber (literal 8), VNumber (literal 9), VNumber (literal 9)]),
           testCase "[_ + 1, _ + 2] <*> [5, 10] -> [6, 11, 7, 12]" $ do
             let listArgs = CTList tListNum [cNum 5, cNum 10]
 
@@ -127,7 +135,7 @@ evaluatorTests =
 
             let apE = CTIdentifier (lFuncT ->> tListNum ->> tListNum) (B Ap)
             let expr = CTApply tListNum (CTApply (tListNum ->> tListNum) apE listFuncs) listArgs
-            assertEval expr (VList $ toDropList [vNum 6, vNum 11, vNum 7, vNum 12]),
+            assertEval expr (vList STNumber [VNumber (literal 6), VNumber (literal 11), VNumber (literal 7), VNumber (literal 12)]),
           testCase "[1, 2] >>= \\x -> [x, x] -> [1, 1, 2, 2]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
             let bindFunc =
@@ -143,15 +151,15 @@ evaluatorTests =
 
             let bindT = tListNum ->> (tNum ->> tListNum) ->> tListNum
             let bindE = CTIdentifier bindT (B Bind)
-            let expr = CTApply tListNum (CTApply bindT bindE listArgs) bindFunc
-            assertEval expr (VList $ toDropList [vNum 1, vNum 1, vNum 2, vNum 2]),
+            let expr = CTApply tListNum (CTApply ((tNum ->> tListNum) ->> tListNum) bindE listArgs) bindFunc
+            assertEval expr (vList STNumber [VNumber (literal 1), VNumber (literal 1), VNumber (literal 2), VNumber (literal 2)]),
           testCase "liftMask (_ == 1) [1, 2, 3] -> [True, False, False]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2, cNum 3]
             let predicateT = tListNum ->> TList TBool
             let liftMaskT = (TNumber ->> TBool) ->> predicateT
             let selectorFunc = CTApply (TFunction TNumber TBool) (CTIdentifier (TFunction TNumber (TFunction TNumber TBool)) (B Eq)) (cNum 1)
             let expr = CTApply (TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs
-            assertEval expr (VList $ toDropList [VBool True, VBool False, VBool False]),
+            assertEval expr (vList STBool [VBool True, VBool False, VBool False]),
           mkHiLoTest Highest "highest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, False, True, False, False, False, True, True, False, False, False, False] 3,
           mkHiLoTest Lowest "lowest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, True, False, False, True, False, False, False, False, False, True, False] 3,
           mkHiLoTest Highest "highest is stable" [1, 2, 3, 5, 5, 5, 5, 4] [False, False, False, True, True, True, False, False] 3,
@@ -260,6 +268,6 @@ evaluatorTests =
                     ]
                     (CTApply TBool (CTIdentifier tNumToBool (S "even")) (cNum 4))
 
-            assertEval expr (VBool True)
+            assertEval expr (vBool True)
         ]
     ]

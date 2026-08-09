@@ -50,9 +50,11 @@ library
                     , TypeChecker.Infer
                     , TypeChecker.Singletons
                     , Evaluator
+                    , Evaluator.Core
                     , Evaluator.Types
                     , Evaluator.Assertions
-                    , Evaluator.Builtins
+                    , Evaluator.Builtins.Pure
+                    , Evaluator.Builtins.HigherOrder
                     , Evaluator.Builtins.DicePrimitives
                     , Evaluator.WeedNumber
                     , Evaluator.Metadata

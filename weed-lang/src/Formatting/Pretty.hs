@@ -147,7 +147,7 @@ instance Pretty a => Pretty (DropItem a) where
 instance Pretty a => Pretty (DropList a) where
   prettyPrint (DropList xs) = prettyPrint xs
 
-instance Pretty Value where
+instance Pretty (Value k) where
   prettyPrint (VNumber n) = prettyPrint n
   prettyPrint (VBool b) = show b
   prettyPrint VUnit = "()"
@@ -157,10 +157,12 @@ instance Pretty Value where
   prettyPrint (VPool _ _) = "<A Pool>"
   prettyPrint (VDice _) = "<A Dice>"
 
+instance Pretty SomeValue where
+  prettyPrint (SomeValue _ v) = prettyPrint v
+
 instance Pretty EvaluationError where
   prettyPrint DivisionByZero = "Division by zero"
   prettyPrint (DomainError b) = "Domain error: Builtin " <> prettyPrint b <> " expected real, got complex"
-  prettyPrint (TypeError t v) = "Type error: Expected " <> prettyPrint t <> ", got " <> prettyPrint v
   prettyPrint (BadDieParameter b s v) = "Bad die parameter: " <> prettyPrint b <> " " <> s <> " , got " <> prettyPrint v
   prettyPrint InfiniteRecursiveBinding = "Mutually recursive let block contained strictly evaluated bindings (would <<loop>>)"
   prettyPrint (InterpreterBug s) = "Interpreter bug: " <> s

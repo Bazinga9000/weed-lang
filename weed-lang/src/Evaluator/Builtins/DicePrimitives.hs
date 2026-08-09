@@ -14,17 +14,23 @@ import Evaluator.DropList (DropItem(K))
 import Numeric (log)
 import Test.QuickCheck.Gen
 import TowerNumber.Core
+import TypeChecker.Singletons
+import TypeChecker.Types
 
-wrapOne :: (Builtin, Text) -> (Value -> Eval a) -> (a -> Gen Value) -> Value
-wrapOne (builtin, expected) assertion fn = VBuiltin $ \v -> do
-  v' <- catchError (assertion v) (const $ throwError $ BadDieParameter builtin ("expected " <> expected) v)
+-- The wrappers take a domain assertion (WeedNumber -> Eval a) and a sampling
+-- function (a -> Gen (Value t)), and produce a typed die builtin.
+
+wrapOne :: SWeedType t -> (Builtin, Text) -> (WeedNumber -> Eval a) -> (a -> Gen (Value t)) -> Value (TFunction TNumber (TDice t))
+wrapOne st (builtin, expected) assertion fn = VBuiltin $ TypedFun STNumber (STDice st) $ \(VNumber wn) -> do
+  v' <- catchError (assertion wn) (const $ throwError $ BadDieParameter builtin ("expected " <> expected) (SomeValue STNumber (VNumber wn)))
   return . VDice . liftGen . fn $ v'
 
-wrapTwo :: (Builtin, Text, Text) -> (Value -> Eval a) -> (Value -> Eval b) -> (a -> b -> Gen Value) -> Value
-wrapTwo (builtin, exp1, exp2) ass1 ass2 fn = VBuiltin $ \va -> return . VBuiltin $ \vb -> do
-  va' <- catchError (ass1 va) (const $ throwError $ BadDieParameter builtin ("expected " <> exp1) va)
-  vb' <- catchError (ass2 vb) (const $ throwError $ BadDieParameter builtin ("expected " <> exp2) vb)
-  return . VDice . liftGen $ fn va' vb'
+wrapTwo :: SWeedType t -> (Builtin, Text, Text) -> (WeedNumber -> Eval a) -> (WeedNumber -> Eval b) -> (a -> b -> Gen (Value t)) -> Value (TFunction TNumber (TFunction TNumber (TDice t)))
+wrapTwo st (builtin, exp1, exp2) ass1 ass2 fn = VBuiltin $ TypedFun STNumber (STFunction STNumber (STDice st)) $ \(VNumber wa) ->
+  return $ VBuiltin $ TypedFun STNumber (STDice st) $ \(VNumber wb) -> do
+    va' <- catchError (ass1 wa) (const $ throwError $ BadDieParameter builtin ("expected " <> exp1) (SomeValue STNumber (VNumber wa)))
+    vb' <- catchError (ass2 wb) (const $ throwError $ BadDieParameter builtin ("expected " <> exp2) (SomeValue STNumber (VNumber wb)))
+    return . VDice . liftGen $ fn va' vb'
 
 crit :: WeedNumber -> WeedNumber
 crit = (metadata . _Just . critLevel) .~ Multibool (1, 0)
@@ -39,11 +45,8 @@ noCritFail :: WeedNumber -> WeedNumber
 noCritFail = (metadata . _Just . failLevel) .~ Multibool (0, 1)
 
 -- A standard die
--- Samples a uniform integer from [1, sides]
--- crits on: sides
--- fails on: 1
-d :: Value
-d = wrapOne (DiceD, "a positive integer") assertPositive dCore
+d :: Value (TFunction TNumber (TDice TNumber))
+d = wrapOne STNumber (DiceD, "a positive integer") (assertPositive DiceD) dCore
   where
     dCore sides = do
       res <- chooseInteger (1, fromPositive sides)
@@ -56,22 +59,17 @@ d = wrapOne (DiceD, "a positive integer") assertPositive dCore
               | otherwise -> noCritFail . noCrit $ wn
       return $ VNumber wn'
 
--- a set die
--- samples its list uniformly
--- inherits crit data from its list elems if they're numbers
-s :: Value
-s = wrapOne (DiceS, "a non-empty list") assertNonEmptyList sCore
-  where
-    sCore nel = elements $ [x | K x <- toList nel]
+-- a set die: samples its list uniformly. Needs the list element type.
+s :: SWeedType a -> Value (TFunction (TList a) (TDice a))
+s sa = VBuiltin $ TypedFun (STList sa) (STDice sa) $ \(VList l) -> do
+  ne <- assertNonEmptyList DiceS l
+  return $ VDice $ liftGen $ elements [x | K x <- toList ne]
 
 -- fudge die
--- samples a uniform integer from [-bound, bound]
--- crits on: bound
--- fails on: -bound
-f :: Value
-f = wrapOne (DiceF, "a natural number") assertNatural fCore
+f :: Value (TFunction TNumber (TDice TNumber))
+f = wrapOne STNumber (DiceF, "a natural number") (assertNatural DiceF) fCore
   where
-    fCore :: Natural -> Gen Value
+    fCore :: Natural -> Gen (Value TNumber)
     fCore bound = do
       let ibound = toInteger bound
       res <- chooseInteger (-ibound, ibound)
@@ -85,19 +83,15 @@ f = wrapOne (DiceF, "a natural number") assertNatural fCore
       return $ VNumber wn'
 
 -- uniform float die
--- samples a uniform double from the interval (0, i)
--- never crits nor fails
-u :: Value
-u = wrapOne (DiceU, "a positive real") assertPositiveReal uCore
+u :: Value (TFunction TNumber (TDice TNumber))
+u = wrapOne STNumber (DiceU, "a positive real") (assertPositiveReal DiceU) uCore
   where
     uCore i =
       VNumber . noCritFail . noCrit . blank . D <$> choose (0.0, i)
 
 -- gaussian die
--- samples a gaussian with mean 0 and stdev sigma
--- never crits nor fails
-gauss :: Value
-gauss = wrapOne (DiceGauss, "a positive real") assertPositiveReal gaussCore
+gauss :: Value (TFunction TNumber (TDice TNumber))
+gauss = wrapOne STNumber (DiceGauss, "a positive real") (assertPositiveReal DiceGauss) gaussCore
   where
     gaussCore sigma =
       VNumber . noCritFail . noCrit . blank <$> do
@@ -107,10 +101,8 @@ gauss = wrapOne (DiceGauss, "a positive real") assertPositiveReal gaussCore
         return . D $ sigma * z
 
 -- pareto die
--- samples the pareto distribution with shape parameter alpha
--- never crits nor fails
-pareto :: Value
-pareto = wrapOne (DicePareto, "a positive real") assertPositiveReal paretoCore
+pareto :: Value (TFunction TNumber (TDice TNumber))
+pareto = wrapOne STNumber (DicePareto, "a positive real") (assertPositiveReal DicePareto) paretoCore
   where
     paretoCore alpha =
       VNumber . noCritFail . noCrit . blank <$> do
@@ -118,15 +110,12 @@ pareto = wrapOne (DicePareto, "a positive real") assertPositiveReal paretoCore
         return . D $ u' ** (1.0 / alpha)
 
 -- binomial die
--- samples the binomial distribution with n trials succeding with probability p
--- crits on: n
--- fails on: 0
-binomial :: Value
+binomial :: Value (TFunction TNumber (TFunction TNumber (TDice TNumber)))
 binomial =
-  wrapTwo
+  wrapTwo STNumber
     (DiceBinomial, "a positive integer", "a probability between 0 and 1")
-    assertPositive
-    (assertRealPredicate $ \prob -> prob >= 0.0 && prob <= 1.0)
+    (assertPositive DiceBinomial)
+    (assertRealPredicate DiceBinomial $ \prob -> prob >= 0.0 && prob <= 1.0)
     binomialCore
   where
     binomialCore trials prob = do
@@ -141,15 +130,12 @@ binomial =
       return $ VNumber wn'
 
 -- coin
--- either true or false, with 50% odds
-coin :: Value
+coin :: Value (TDice TBool)
 coin = VDice $ liftGen $ elements [VBool True, VBool False]
 
 -- circle
--- samples a random complex on the circle of radius r, centered at the origin
--- never crits nor fails
-circle :: Value
-circle = wrapOne (DiceCircle, "a positive real") assertPositiveReal circleCore
+circle :: Value (TFunction TNumber (TDice TNumber))
+circle = wrapOne STNumber (DiceCircle, "a positive real") (assertPositiveReal DiceCircle) circleCore
   where
     circleCore r = do
       theta <- choose (0.0, 2.0 * pi)

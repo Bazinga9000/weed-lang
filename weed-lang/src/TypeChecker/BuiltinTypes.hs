@@ -49,7 +49,7 @@ predicateMapModifier = do
   let ts = TVar s
       ta = TVar a
       tr = TVar r
-  return $ ForAll [s, a, r] [CInstanceOf $ CRollable tr, CInstanceOf $ CSelector ta ts] (ts ->> TApp tr ta ->> TApp tr ta)
+  return $ ForAll [s, a, r] [CInstanceOf $ CRollable tr, CInstanceOf $ CSelector ta ts] (ts ->> TApp tr ta ->> TPool ta)
 
 builtinType :: Builtin -> Infer WeedTypeScheme
 builtinType Negate = num1
