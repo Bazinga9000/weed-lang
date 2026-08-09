@@ -70,20 +70,20 @@ lexerTests =
             scanTokens "3s" @?= [TokenNum 3.0, TokenBuiltin DiceS],
           testCase "Splits concatenated dice pools (4d6)" $ do
             scanTokens "4d6"
-              @?= [TokenNum 4.0, TokenBuiltin DiceD, TokenNum 6.0],
+              @?= [TokenLParen, TokenNum 4.0, TokenOp "#", TokenBuiltin DiceD, TokenNum 6.0, TokenRParen],
           testCase "Lexes space-separated pools cleanly (4 d6)" $ do
             scanTokens "4 d6"
-              @?= [TokenNum 4.0, TokenBuiltin DiceD, TokenNum 6.0],
+              @?= [TokenLParen, TokenNum 4.0, TokenOp "#", TokenBuiltin DiceD, TokenNum 6.0, TokenRParen],
           testCase "Lexes other primitive dice" $ do
             scanTokens "gauss 5" @?= [TokenBuiltin DiceGauss, TokenNum 5.0]
             scanTokens "binomial 10 0.5" @?= [TokenBuiltin DiceBinomial, TokenNum 10.0, TokenNum 0.5]
             scanTokens "coin" @?= [TokenBuiltin DiceCoin]
             scanTokens "4coin" @?= [TokenNum 4.0, TokenBuiltin DiceCoin]
-            scanTokens "4u6" @?= [TokenNum 4.0, TokenBuiltin DiceU, TokenNum 6.0]
-            scanTokens "18f3" @?= [TokenNum 18.0, TokenBuiltin DiceF, TokenNum 3.0]
+            scanTokens "4u6" @?= [TokenLParen, TokenNum 4.0, TokenOp "#", TokenBuiltin DiceU, TokenNum 6.0, TokenRParen]
+            scanTokens "18f3" @?= [TokenLParen, TokenNum 18.0, TokenOp "#", TokenBuiltin DiceF, TokenNum 3.0, TokenRParen]
             scanTokens "gauss7" @?= [TokenBuiltin DiceGauss, TokenNum 7.0]
             scanTokens "pareto5" @?= [TokenBuiltin DicePareto, TokenNum 5.0]
-            scanTokens "7circle1" @?= [TokenNum 7.0, TokenBuiltin DiceCircle, TokenNum 1.0]
+            scanTokens "7circle1" @?= [TokenLParen, TokenNum 7.0, TokenOp "#", TokenBuiltin DiceCircle, TokenNum 1.0, TokenRParen]
         ],
       testGroup
         "Complex Combinations"

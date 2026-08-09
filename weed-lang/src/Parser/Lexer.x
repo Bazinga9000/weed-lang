@@ -64,47 +64,44 @@ data Token
 -- interceptor pass to make builtins into their proper tokens.
 refineTokens :: [Token] -> [Token]
 refineTokens [] = []
-refineTokens (TokenIdent s : ts) = case s of
-  -- builtin functions
-  -- "keep"   -> TokenBuiltin Keep : refineTokens ts
-  -- "drop"   -> TokenBuiltin Drop : refineTokens ts
-  -- "sum"    -> TokenBuiltin Sum : refineTokens ts
-  -- "highest" -> TokenBuiltin Highest : refineTokens ts
-
-  -- primitive dice (standalone)
-  "d"        -> TokenBuiltin DiceD : refineTokens ts
-  "f"        -> TokenBuiltin DiceF : refineTokens ts
-  "s"        -> TokenBuiltin DiceS : refineTokens ts
-  "u"        -> TokenBuiltin DiceU : refineTokens ts
-  "gauss"    -> TokenBuiltin DiceGauss : refineTokens ts
-  "pareto"   -> TokenBuiltin DicePareto : refineTokens ts
-  "binomial" -> TokenBuiltin DiceBinomial : refineTokens ts
-  "coin"     -> TokenBuiltin DiceCoin : refineTokens ts
-  "circle"   -> TokenBuiltin DiceCircle : refineTokens ts
-
-  -- concatenated dice splitting (e.g. "d6", "d100", "d%")
-  "d%" -> TokenBuiltin DiceD : TokenNum 100 : refineTokens ts
-  "dF" -> TokenBuiltin DiceF : TokenNum 1 : refineTokens ts
-  ('d':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceD : TokenNum (parseTN rest) : refineTokens ts
-  ('u':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceU : TokenNum (parseTN rest) : refineTokens ts
-  ('f':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceF : TokenNum (parseTN rest) : refineTokens ts
-  ('g':'a':'u':'s':'s':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceGauss : TokenNum (parseTN rest) : refineTokens ts
-  ('p':'a':'r':'e':'t':'o':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DicePareto : TokenNum (parseTN rest) : refineTokens ts
-  ('b':'i':'n':'o':'m':'i':'a':'l':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceBinomial : TokenNum (parseTN rest) : refineTokens ts
-  ('c':'i':'r':'c':'l':'e':rest) | not (null rest) && all isDigit rest ->
-      TokenBuiltin DiceCircle : TokenNum (parseTN rest) : refineTokens ts
-
+-- pool sugar: a number immediately followed by a concatenated die (e.g. 4 d6)
+-- becomes the poolify infix 4 # d 6. This must fire before the TokenIdent
+-- case below splits the die, so that 'keep f 4d6' parses as 'keep f (4#d6)'
+-- rather than '(keep f 4) d 6'.
+refineTokens (TokenNum n : TokenIdent s : ts)
+  | Just (dieBlt, sides@(_:_)) <- parseConcatDie s =
+      -- wrap in parens so the pool parses as an atom
+      -- Only fires for dice with explicit sides (NdX) e.g 3coin is not a pool
+      TokenLParen : TokenNum n : TokenOp "#" : TokenBuiltin dieBlt : TokenNum (parseTN sides) : TokenRParen : refineTokens ts
+refineTokens (TokenIdent s : ts) = case parseConcatDie s of
+  -- dice (bare "d", or concatenated "d6", "d100", "d%")
+  Just (dieBlt, sides) ->
+      TokenBuiltin dieBlt : (if null sides then id else (TokenNum (parseTN sides) :)) (refineTokens ts)
   -- just an identifier
-  _        -> TokenIdent s : refineTokens ts
+  Nothing -> TokenIdent s : refineTokens ts
 
 -- do nothing to everything else
 refineTokens (t:ts) = t : refineTokens ts
+
+-- | Parse a die string into its builtin and sides. "d" -> (DiceD, "");
+-- "d6" -> (DiceD, "6"); "d%" -> (DiceD, "100"); "coin" -> (DiceCoin, "").
+-- Returns Nothing if it's not a die at all.
+parseConcatDie :: String -> Maybe (Builtin, String)
+parseConcatDie "d%" = Just (DiceD, "100")
+parseConcatDie "dF" = Just (DiceF, "1")
+parseConcatDie "d" = Just (DiceD, "")
+parseConcatDie "f" = Just (DiceF, "")
+parseConcatDie "s" = Just (DiceS, "")
+parseConcatDie "u" = Just (DiceU, "")
+parseConcatDie "coin" = Just (DiceCoin, "")
+parseConcatDie ('d':rest) | all isDigit rest = Just (DiceD, rest)
+parseConcatDie ('u':rest) | all isDigit rest = Just (DiceU, rest)
+parseConcatDie ('f':rest) | all isDigit rest = Just (DiceF, rest)
+parseConcatDie ('g':'a':'u':'s':'s':rest) | all isDigit rest = Just (DiceGauss, rest)
+parseConcatDie ('p':'a':'r':'e':'t':'o':rest) | all isDigit rest = Just (DicePareto, rest)
+parseConcatDie ('b':'i':'n':'o':'m':'i':'a':'l':rest) | all isDigit rest = Just (DiceBinomial, rest)
+parseConcatDie ('c':'i':'r':'c':'l':'e':rest) | all isDigit rest = Just (DiceCircle, rest)
+parseConcatDie _ = Nothing
 
 scanTokens :: String -> [Token]
 scanTokens str = refineTokens (alexScanTokens str)
