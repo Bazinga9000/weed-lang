@@ -128,7 +128,7 @@ data CoreTypedExpr
   | CTLetRec WeedType [Declaration CoreTypedExpr] CoreTypedExpr
   | CTIf WeedType CoreTypedExpr CoreTypedExpr CoreTypedExpr
   deriving
-    ( -- | CTMapPool WeedType CoreTypedExpr CoreTypedExpr -- Maps ([a] -> b) over Pool a -> Dice b
+    (
       Show,
       Eq
     )

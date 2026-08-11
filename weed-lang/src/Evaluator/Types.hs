@@ -31,12 +31,10 @@ liftGen = ExceptT . fmap Right
 roll :: Roll a -> IO (Either EvaluationError a)
 roll = generate . runExceptT
 
--- | The builtin dispatcher, provided by the caller (Evaluator) to avoid a
--- module cycle
+-- builtin dispatcher
+-- caller provides this to avoid module cycle
 newtype FetchBuiltin = FetchBuiltin { runFetchBuiltin :: forall t. SWeedType t -> Builtin -> Eval (Value t) }
 
--- | The evaluator's read-only environment: the variable environment plus the
--- builtin dispatcher (provided by the caller to avoid a module cycle).
 data EvalEnv = EvalEnv
   { envVars :: Env
   , envFetchBuiltin :: FetchBuiltin
@@ -50,19 +48,14 @@ askFetchBuiltin = asks envFetchBuiltin
 askVars :: Eval Env
 askVars = asks envVars
 
--- | A function between typed values, carrying the singletons of its domain
--- and codomain. Unlike a raw 'SomeValue -> Eval SomeValue', this preserves
--- the WEED type index, so 'applyValue' is total and GHC checks that builtin
--- implementations match their claimed types. The singletons let builtins
--- construct correctly-indexed results (e.g. 'Identity' returning its input).
+-- function between two typed values carrying the singletons of its domain and codomain
 data TypedFun a b = TypedFun
   { tfDom :: SWeedType a
   , tfCod :: SWeedType b
   , runTypedFun :: Value a -> Eval (Value b)
   }
 
--- | Build a curried builtin from a Haskell function, given the function's
--- full singleton. This lets GHC check curried builtins against their type.
+-- build a curried builtin from a Haskell function
 curryBuiltin :: SWeedType (TFunction a b) -> (Value a -> Eval (Value b)) -> Value (TFunction a b)
 curryBuiltin (STFunction sa sb) f = VBuiltin $ TypedFun sa sb f
 
