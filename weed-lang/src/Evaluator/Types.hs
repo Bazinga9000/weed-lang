@@ -64,7 +64,7 @@ data Value :: WeedType -> Type where
   VBool :: Bool -> Value TBool
   VUnit :: Value TUnit
   VList :: DropList (Value a) -> Value (TList a)
-  VClosure :: Env -> IdentifierName -> CoreTypedExpr -> Value (TFunction a b)
+  VClosure :: Env -> SWeedType a -> IdentifierName -> CoreElaboratedExpr b -> Value (TFunction a b)
   VBuiltin :: TypedFun a b -> Value (TFunction a b)
   VDice :: Roll (Value a) -> Value (TDice a)
   VPool :: Roll (DropList (Value a)) -> Roll (Value a) -> Value (TPool a)

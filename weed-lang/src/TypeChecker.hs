@@ -5,8 +5,10 @@ module TypeChecker where
 import AST
 import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.RWS.CPS (censor, listen, runRWST, tell)
+import Data.Type.Equality hiding (apply)
 import TypeChecker.BuiltinTypes
 import TypeChecker.Infer
+import TypeChecker.Singletons
 import TypeChecker.Subst
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum, lookupEnv)
@@ -356,3 +358,65 @@ typeCheck expr = do
   solve subst constraints
   -- if we got here, constraint solving succeded, apply the final subs to concretize every node's type
   return $ apply subst typed
+
+elaborate :: CoreTypedExpr -> Either TypeError SomeCoreElaboratedExpr
+elaborate e = do
+  SomeSWeedType sWell <- extractSingleton e
+  ex <- elaborate' sWell e
+  return $ SomeCoreElaboratedExpr sWell ex
+  where
+    extractSingleton e' = case toSingleton (getType e') of
+      Nothing -> throwError $ TypeCheckerBug "extractSingleton: non-ground type"
+      Just x -> return x
+
+    elaborateAt :: SWeedType t -> CoreTypedExpr -> Either TypeError (CoreElaboratedExpr t)
+    elaborateAt st e' = do
+      SomeSWeedType se <- extractSingleton e'
+      case testEquality st se of
+        Just Refl -> elaborate' st e'
+        Nothing -> throwError $ TypeCheckerBug "elaborateAt: annotation/expected type mismatch"
+
+    elaborate' :: SWeedType t -> CoreTypedExpr -> Either TypeError (CoreElaboratedExpr t)
+    elaborate' STNumber (CTNumber n) = Right $ CENumber n
+    elaborate' STBool (CTBool b) = Right $ CEBool b
+    elaborate' STUnit CTUnit = Right CEUnit
+    elaborate' (STList se) (CTList _ xs) = CEList se <$> traverse (elaborateAt se) xs
+    elaborate' st (CTIdentifier _ ident) = Right $ CEIdentifier st ident
+    elaborate' (STFunction sa sb) (CTLambda _ ident body) = CELambda sa ident <$> elaborateAt sb body
+    elaborate' sb (CTApply _ f a) = do
+      SomeSWeedType sf <- extractSingleton f
+      case sf of
+        STFunction sa sb' -> do
+          ef <- elaborate' sf f
+          ea <- elaborate' sa a
+          case testEquality sb sb' of
+            Just Refl -> Right $ CEApply ef ea
+            Nothing -> throwError $ TypeCheckerBug "elaborate': function codomain does not match result type"
+        _ -> throwError $ TypeCheckerBug "elaborate': applied non-function"
+    elaborate' sl (CTLet _ (Decl ident binding) body) = do
+      SomeSWeedType sbinding <- extractSingleton binding
+      ebody <- elaborate' sl body
+      ebinding <- elaborate' sbinding binding
+      Right $ CELet sbinding ident ebinding ebody
+    elaborate' slr (CTLetRec _ decls body) = do
+      ebody <- elaborate' slr body
+      edecls <- traverse (traverse elaborate) decls
+      Right $ CELetRec edecls ebody
+    elaborate' si (CTIf _ cond thn els) = do
+      SomeCoreElaboratedExpr sc' ec <- elaborate cond
+      case (sc', si) of
+        (STBool, _) -> do
+          ethn <- elaborateAt si thn
+          eels <- elaborateAt si els
+          Right $ CEIf ec ethn eels
+        -- dice: condition is TDice TBool, result is TDice (branch type); sc = STDice (branch type)
+        (STDice STBool, STDice sbranch) -> do
+          ethn <- elaborateAt (STDice sbranch) thn
+          eels <- elaborateAt (STDice sbranch) els
+          Right $ CEIfDice ec ethn eels
+        (STPool STBool, STPool sbranch) -> do
+          ethn <- elaborateAt (STPool sbranch) thn
+          eels <- elaborateAt (STPool sbranch) els
+          Right $ CEIfPool ec ethn eels
+        _ -> throwError $ TypeCheckerBug "if: bad condition/result"
+    elaborate' _ _ = throwError $ TypeCheckerBug "elaborate': ill-formed typed AST"

@@ -2,6 +2,7 @@ module AST where
 
 import TowerNumber.Core (TowerNumber)
 import TypeChecker.Types
+import TypeChecker.Singletons
 
 data IdentifierName
   = S String
@@ -9,13 +10,7 @@ data IdentifierName
   | B Builtin
   deriving (Show, Eq, Ord)
 
-data Declaration e = Decl IdentifierName e deriving (Eq, Show)
-
-instance Functor Declaration where
-  fmap f (Decl ident e) = Decl ident $ f e
-
-instance Foldable Declaration where
-  foldMap f (Decl _ x) = f x
+data Declaration e = Decl IdentifierName e deriving (Eq, Show, Functor, Foldable, Traversable)
 
 newtype Module a = Module [Declaration a] deriving (Eq, Show)
 
@@ -134,6 +129,21 @@ data CoreTypedExpr
     )
 
 type CoreTypedModule = Module CoreTypedExpr
+
+data CoreElaboratedExpr :: WeedType -> Type where
+  CENumber :: TowerNumber -> CoreElaboratedExpr TNumber
+  CEBool :: Bool -> CoreElaboratedExpr TBool
+  CEUnit :: CoreElaboratedExpr TUnit
+  CEList :: SWeedType a -> [CoreElaboratedExpr a] -> CoreElaboratedExpr (TList a)
+  CEIdentifier :: SWeedType t -> IdentifierName -> CoreElaboratedExpr t
+  CELambda :: SWeedType a -> IdentifierName -> CoreElaboratedExpr b -> CoreElaboratedExpr (TFunction a b)
+  CEApply :: CoreElaboratedExpr (TFunction a b) -> CoreElaboratedExpr a -> CoreElaboratedExpr b
+  CELet :: SWeedType a -> IdentifierName -> CoreElaboratedExpr a -> CoreElaboratedExpr b -> CoreElaboratedExpr b
+  CELetRec :: [Declaration SomeCoreElaboratedExpr] -> CoreElaboratedExpr c -> CoreElaboratedExpr c
+  CEIf :: CoreElaboratedExpr TBool -> CoreElaboratedExpr a -> CoreElaboratedExpr a -> CoreElaboratedExpr a
+  CEIfDice :: CoreElaboratedExpr (TDice TBool) -> CoreElaboratedExpr (TDice a) -> CoreElaboratedExpr (TDice a) -> CoreElaboratedExpr (TDice a)
+  CEIfPool :: CoreElaboratedExpr (TPool TBool) -> CoreElaboratedExpr (TPool a) -> CoreElaboratedExpr (TPool a) -> CoreElaboratedExpr (TPool a)
+data SomeCoreElaboratedExpr = forall t. SomeCoreElaboratedExpr (SWeedType t) (CoreElaboratedExpr t)
 
 getType :: CoreTypedExpr -> WeedType
 getType (CTNumber _) = TNumber

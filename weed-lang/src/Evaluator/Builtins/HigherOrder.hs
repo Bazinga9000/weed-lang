@@ -46,7 +46,7 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa sb) (STFunction (STList sla) 
     (Just Refl, Just Refl) ->
       return $ VBuiltin $ TypedFun (STFunction sa sb) (STFunction (STList sla) (STList slb)) $ \f ->
         return $ VBuiltin $ TypedFun (STList sla) (STList slb) $ \(VList l) ->
-          VList <$> mapMDropList (applyValue (STFunction sa sb) f) l
+          VList <$> mapMDropList (applyValue f) l
     _ -> throwError $ InterpreterBug "Map: type mismatch"
 fetchBuiltinHigherOrder (STFunction (STFunction sa sb) (STFunction (STDice sda) (STDice sdb))) Map =
   case (testEquality sa sda, testEquality sb sdb) of
@@ -55,7 +55,7 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa sb) (STFunction (STDice sda) 
         return $ VBuiltin $ TypedFun (STDice sda) (STDice sdb) $ \(VDice d) -> do
           env <- askVars
           fb <- askFetchBuiltin
-          return $ VDice $ d >>= applyValueRoll fb env (STFunction sa sb) f
+          return $ VDice $ d >>= applyValueRoll fb env f
     _ -> throwError $ InterpreterBug "Map: type mismatch"
 fetchBuiltinHigherOrder (STFunction (STFunction sa sb) (STFunction (STPool spa) (STPool spb))) Map =
   case (testEquality sa spa, testEquality sb spb) of
@@ -64,8 +64,8 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa sb) (STFunction (STPool spa) 
         return $ VBuiltin $ TypedFun (STPool spa) (STPool spb) $ \(VPool pool source) -> do
           env <- askVars
           fb <- askFetchBuiltin
-          let mappedPool = pool >>= mapMDropList (applyValueRoll fb env (STFunction sa sb) f)
-          let mappedSource = source >>= applyValueRoll fb env (STFunction sa sb) f
+          let mappedPool = pool >>= mapMDropList (applyValueRoll fb env f)
+          let mappedSource = source >>= applyValueRoll fb env f
           return $ VPool mappedPool mappedSource
     _ -> throwError $ InterpreterBug "Map: type mismatch"
 
@@ -79,7 +79,7 @@ fetchBuiltinHigherOrder (STFunction (STFunction (STList sa) sb) (STFunction (STP
           fb <- askFetchBuiltin
           return $ VDice $ do
             rolls <- pool
-            applyValueRoll fb env (STFunction (STList sa) sb) f (VList rolls)
+            applyValueRoll fb env f (VList rolls)
     _ -> throwError $ InterpreterBug "MapP: type mismatch"
 
 -- ap
@@ -88,7 +88,7 @@ fetchBuiltinHigherOrder (STFunction (STList (STFunction sa sb)) (STFunction (STL
     (Just Refl, Just Refl) ->
       return $ VBuiltin $ TypedFun (STList (STFunction sa sb)) (STFunction (STList sla) (STList slb)) $ \(VList lf) ->
         return $ VBuiltin $ TypedFun (STList sla) (STList slb) $ \(VList la) ->
-          VList <$> sequenceDropList (fmap (applyValue (STFunction sa sb)) lf <*> la)
+          VList <$> sequenceDropList (fmap applyValue lf <*> la)
     _ -> throwError $ InterpreterBug "Ap: type mismatch"
 fetchBuiltinHigherOrder (STFunction (STDice (STFunction sa sb)) (STFunction (STDice sda) (STDice sdb))) Ap =
   case (testEquality sa sda, testEquality sb sdb) of
@@ -100,7 +100,7 @@ fetchBuiltinHigherOrder (STFunction (STDice (STFunction sa sb)) (STFunction (STD
           return $ VDice $ do
             vf <- df
             va <- da
-            applyValueRoll fb env (STFunction sa sb) vf va
+            applyValueRoll fb env vf va
     _ -> throwError $ InterpreterBug "Ap: type mismatch"
 fetchBuiltinHigherOrder (STFunction (STPool (STFunction sa sb)) (STFunction (STPool spa) (STPool spb))) Ap =
   case (testEquality sa spa, testEquality sb spb) of
@@ -114,12 +114,12 @@ fetchBuiltinHigherOrder (STFunction (STPool (STFunction sa sb)) (STFunction (STP
               ( do
                   pf <- poolf
                   pa <- poola
-                  sequenceDropList $ fmap (applyValueRoll fb env (STFunction sa sb)) pf <*> pa
+                  sequenceDropList $ fmap (applyValueRoll fb env) pf <*> pa
               )
               ( do
                   vf <- sourcef
                   va <- sourcea
-                  applyValueRoll fb env (STFunction sa sb) vf va
+                  applyValueRoll fb env vf va
               )
     _ -> throwError $ InterpreterBug "Ap: type mismatch"
 
@@ -129,7 +129,7 @@ fetchBuiltinHigherOrder (STFunction (STList sa) (STFunction (STFunction sax (STL
     (Just Refl, Just Refl) ->
       return $ VBuiltin $ TypedFun (STList sa) (STFunction (STFunction sax (STList sb)) (STList slb)) $ \(VList l) ->
         return $ VBuiltin $ TypedFun (STFunction sax (STList sb)) (STList slb) $ \f -> do
-          vs <- mapMDropList (applyValue (STFunction sa (STList sb)) f) l
+          vs <- mapMDropList (applyValue f) l
           VList . join <$> mapMDropList (\(VList inner) -> return inner) vs
     _ -> throwError $ InterpreterBug "Bind: type mismatch"
 fetchBuiltinHigherOrder (STFunction (STDice sa) (STFunction (STFunction sax (STDice sb)) (STDice sdb))) Bind =
@@ -141,7 +141,7 @@ fetchBuiltinHigherOrder (STFunction (STDice sa) (STFunction (STFunction sax (STD
           fb <- askFetchBuiltin
           return $ VDice $ do
             v <- d
-            bound <- applyValueRoll fb env (STFunction sa (STDice sb)) f v
+            bound <- applyValueRoll fb env f v
             case bound of
               VDice d' -> d'
     _ -> throwError $ InterpreterBug "Bind: type mismatch"
@@ -157,7 +157,7 @@ fetchBuiltinHigherOrder (STFunction (STPool sa) (STFunction (STFunction sax (STP
                 nestedLists <-
                   mapMDropList
                     ( \val -> do
-                        bound <- applyValueRoll fb env (STFunction sa (STPool sb)) f val
+                        bound <- applyValueRoll fb env f val
                         case bound of
                           VPool p _ -> p
                     )
@@ -165,7 +165,7 @@ fetchBuiltinHigherOrder (STFunction (STPool sa) (STFunction (STFunction sax (STP
                 return (join nestedLists)
               boundSource = do
                 val <- source
-                bound <- applyValueRoll fb env (STFunction sa (STPool sb)) f val
+                bound <- applyValueRoll fb env f val
                 case bound of
                   VPool _ s -> s
           return $ VPool boundPool boundSource
@@ -242,8 +242,8 @@ fetchBuiltinHigherOrder (STFunction sa (STFunction sb STBool)) Neq =
       let eqBuiltin = mkEquality sa
        in return $ VBuiltin $ TypedFun sa (STFunction sb STBool) $ \a ->
             return $ VBuiltin $ TypedFun sb STBool $ \b -> do
-              eq1 <- applyValue (STFunction sa (STFunction sa STBool)) eqBuiltin a
-              r <- applyValue (STFunction sa STBool) eq1 b
+              eq1 <- applyValue eqBuiltin a
+              r <- applyValue eq1 b
               case r of
                 VBool b' -> return $ VBool (not b')
     Nothing -> throwError $ InterpreterBug "Neq: argument types differ"
@@ -258,14 +258,14 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STList s
     (Just Refl, Just Refl) ->
       return $ VBuiltin $ TypedFun (STFunction sa STBool) (STFunction (STList sla) (STList slb)) $ \f ->
         return $ VBuiltin $ TypedFun (STList sla) (STList slb) $ \(VList l) ->
-          VList <$> mapMDropList (applyValue (STFunction sa STBool) f) l
+          VList <$> mapMDropList (applyValue f) l
     _ -> throwError $ InterpreterBug "LiftMask: type mismatch"
 fetchBuiltinHigherOrder (STFunction (STFunction (STList sa) (STList STBool)) (STFunction (STList sla) (STList slb))) LiftMask =
   case (testEquality sa sla, testEquality STBool slb) of
     (Just Refl, Just Refl) ->
       return $ VBuiltin $ TypedFun (STFunction (STList sa) (STList STBool)) (STFunction (STList sla) (STList slb)) $ \f ->
         return $ VBuiltin $ TypedFun (STList sla) (STList slb) $ \l ->
-          applyValue (STFunction (STList sa) (STList STBool)) f l
+          applyValue f l
     _ -> throwError $ InterpreterBug "LiftMask: type mismatch"
 
 -- highest / lowest: Number -> [Number] -> [Bool]
@@ -295,7 +295,7 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STDice s
           env <- askVars
           fb <- askFetchBuiltin
           let mkExplode src v = do
-                r <- applyValueRoll fb env (STFunction sa STBool) predicate v
+                r <- applyValueRoll fb env predicate v
                 case r of
                   VBool False -> return $ one v
                   VBool True -> do
@@ -311,7 +311,7 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STPool s
           env <- askVars
           fb <- askFetchBuiltin
           let mkExplode s v = do
-                r <- applyValueRoll fb env (STFunction sa STBool) predicate v
+                r <- applyValueRoll fb env predicate v
                 case r of
                   VBool False -> return $ one v
                   VBool True -> do
@@ -336,13 +336,13 @@ runLiftMask fb env (STFunction sa STBool) sla predicate =
   case testEquality sa sla of
     Just Refl ->
       -- selector is a -> Bool: map it over the list
-      return $ \(VList l) -> VList <$> mapMDropList (applyValueRoll fb env (STFunction sa STBool) predicate) l
+      return $ \(VList l) -> VList <$> mapMDropList (applyValueRoll fb env predicate) l
     Nothing -> throwError $ InterpreterBug "runLiftMask: element type mismatch"
 runLiftMask fb env (STFunction (STList sa) (STList STBool)) sla predicate =
   case testEquality sa sla of
     Just Refl ->
       -- selector is [a] -> [Bool]: apply it directly
-      return $ \l -> applyValueRoll fb env (STFunction (STList sa) (STList STBool)) predicate l
+      return $ \l -> applyValueRoll fb env predicate l
     Nothing -> throwError $ InterpreterBug "runLiftMask: list element type mismatch"
 runLiftMask _ _ _ _ _ = throwError $ InterpreterBug "runLiftMask: selector is not a function"
 

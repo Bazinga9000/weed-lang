@@ -55,6 +55,11 @@ vList s xs = SomeValue (STList s) (VList $ toDropList xs)
 cNum :: Integer -> CoreTypedExpr
 cNum n = CTNumber (fromInteger n)
 
+-- used to build well-formed branches for effectful CTIf tests.
+cReturn :: WeedType -> CoreTypedExpr -> CoreTypedExpr
+cReturn containerT e =
+  CTApply containerT (CTIdentifier (getType e ->> containerT) (B Return)) e
+
 -- emulate the skeleton of the AST CTMapPool
 cMapPool :: WeedType -> CoreTypedExpr -> CoreTypedExpr -> CoreTypedExpr
 cMapPool ty f p =
@@ -214,7 +219,7 @@ evaluatorTests =
           testCase "if coin then 1 else 2 -> Evaluates (Dice Context)" $ do
             let tDiceBool = TDice TBool
             let coinE = CTIdentifier tDiceBool (B DiceCoin)
-            let expr = CTIf tDiceNum coinE (cNum 1) (cNum 2)
+            let expr = CTIf tDiceNum coinE (cReturn tDiceNum (cNum 1)) (cReturn tDiceNum (cNum 2))
             assertNoError expr,
           testCase "if 4coin then 1 else 2 -> Evaluates (Pool Context)" $ do
             let tDiceBool = TDice TBool
@@ -228,7 +233,7 @@ evaluatorTests =
                     (CTApply (tDiceBool ->> tPoolBool) poolifyE (cNum 4))
                     (CTIdentifier tDiceBool (B DiceCoin))
 
-            let expr = CTIf tPoolNum fourCoin (cNum 1) (cNum 2)
+            let expr = CTIf tPoolNum fourCoin (cReturn tPoolNum (cNum 1)) (cReturn tPoolNum (cNum 2))
             assertNoError expr,
           testCase "if coin then d6 else 0 -> Evaluates (Dice Context - Simultaneous Promotion)" $ do
             let tDiceBool = TDice TBool
@@ -240,7 +245,8 @@ evaluatorTests =
                     (CTIdentifier (TNumber ->> tDiceNum) (B DiceD))
                     (cNum 6)
 
-            let expr = CTIf tDiceNum coinE d6E (cNum 0)
+            let returnDice0 = cReturn tDiceNum (cNum 0)
+            let expr = CTIf tDiceNum coinE d6E returnDice0
             assertNoError expr
         ],
       testGroup

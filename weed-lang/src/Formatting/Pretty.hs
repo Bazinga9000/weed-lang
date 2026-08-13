@@ -153,7 +153,7 @@ instance Pretty (Value k) where
   prettyPrint VUnit = "()"
   prettyPrint (VList xs) = prettyPrint xs
   prettyPrint (VBuiltin _) = "<A Builtin>"
-  prettyPrint (VClosure _ ident body) = "(λ" <> prettyPrint ident <> " -> " <> prettyPrint body <> ")"
+  prettyPrint (VClosure {}) = "<A closure>"
   prettyPrint (VPool _ _) = "<A Pool>"
   prettyPrint (VDice _) = "<A Dice>"
 
