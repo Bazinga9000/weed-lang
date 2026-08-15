@@ -331,7 +331,7 @@ freshExtra v = v
 
 -- | Convert a selector (a -> Bool or [a] -> [Bool]) into a mask function
 -- [a] -> [Bool] running in 'Roll'.
-runLiftMask :: FetchBuiltin -> Env -> SWeedType s -> SWeedType a -> Value s -> Eval (Value (TList a) -> Roll (Value (TList TBool)))
+runLiftMask :: FetchBuiltin -> Env -> SWeedType s -> SWeedType a -> Value s -> Eval (Value (TApp TList a) -> Roll (Value (TApp TList TBool)))
 runLiftMask fb env (STFunction sa STBool) sla predicate =
   case testEquality sa sla of
     Just Refl ->
@@ -348,7 +348,7 @@ runLiftMask _ _ _ _ _ = throwError $ InterpreterBug "runLiftMask: selector is no
 
 -- | Shared keep/drop logic. The mask function runs in 'Roll' (it needs the
 -- environment to apply closures, which 'applyValueRoll' provides).
-keepDropPool :: Builtin -> (Value (TList a) -> Roll (Value (TList TBool))) -> Roll (DropList (Value a)) -> Roll (Value a) -> Eval (Value (TPool a))
+keepDropPool :: Builtin -> (Value (TApp TList a) -> Roll (Value (TApp TList TBool))) -> Roll (DropList (Value a)) -> Roll (Value a) -> Eval (Value (TApp TPool a))
 keepDropPool blt maskFn pool src = return $ VPool pool' src
   where
     isKeep = blt == Keep
@@ -365,7 +365,7 @@ keepDropPool blt maskFn pool src = return $ VPool pool' src
       DropList <$> zipWithM applyOne (getItems vals) (getItems maskResult)
 
 -- | keep/drop for Dice: filtering a single die yields a pool of 0 or 1.
-mkKeepDropDice :: Builtin -> SWeedType sel -> SWeedType a -> Value (TFunction sel (TFunction (TDice a) (TPool a)))
+mkKeepDropDice :: Builtin -> SWeedType sel -> SWeedType a -> Value (TFunction sel (TFunction (TApp TDice a) (TApp TPool a)))
 mkKeepDropDice blt sel sa = VBuiltin $ TypedFun sel (STFunction (STDice sa) (STPool sa)) $ \predicate -> do
   env <- askVars
   fb <- askFetchBuiltin
@@ -374,7 +374,7 @@ mkKeepDropDice blt sel sa = VBuiltin $ TypedFun sel (STFunction (STDice sa) (STP
     keepDropPool blt maskFn (one <$> dice) dice
 
 -- | keep/drop for Pool
-mkKeepDropPool :: Builtin -> SWeedType sel -> SWeedType a -> Value (TFunction sel (TFunction (TPool a) (TPool a)))
+mkKeepDropPool :: Builtin -> SWeedType sel -> SWeedType a -> Value (TFunction sel (TFunction (TApp TPool a) (TApp TPool a)))
 mkKeepDropPool blt sel sa = VBuiltin $ TypedFun sel (STFunction (STPool sa) (STPool sa)) $ \predicate -> do
   env <- askVars
   fb <- askFetchBuiltin
@@ -383,7 +383,7 @@ mkKeepDropPool blt sel sa = VBuiltin $ TypedFun sel (STFunction (STPool sa) (STP
     keepDropPool blt maskFn pool src
 
 -- highest/lowest helper
-mkHiLo :: Builtin -> Bool -> Value (TFunction TNumber (TFunction (TList TNumber) (TList TBool)))
+mkHiLo :: Builtin -> Bool -> Value (TFunction TNumber (TFunction (TApp TList TNumber) (TApp TList TBool)))
 mkHiLo blt isHighest = VBuiltin $ TypedFun STNumber (STFunction (STList STNumber) (STList STBool)) $ \(VNumber wn) ->
   return $ VBuiltin $ TypedFun (STList STNumber) (STList STBool) $ \(VList l) -> do
     n <- assertNatural blt wn

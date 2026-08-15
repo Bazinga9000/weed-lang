@@ -134,15 +134,15 @@ data CoreElaboratedExpr :: WeedType -> Type where
   CENumber :: TowerNumber -> CoreElaboratedExpr TNumber
   CEBool :: Bool -> CoreElaboratedExpr TBool
   CEUnit :: CoreElaboratedExpr TUnit
-  CEList :: SWeedType a -> [CoreElaboratedExpr a] -> CoreElaboratedExpr (TList a)
+  CEList :: SWeedType a -> [CoreElaboratedExpr a] -> CoreElaboratedExpr (TApp TList a)
   CEIdentifier :: SWeedType t -> IdentifierName -> CoreElaboratedExpr t
   CELambda :: SWeedType a -> IdentifierName -> CoreElaboratedExpr b -> CoreElaboratedExpr (TFunction a b)
   CEApply :: CoreElaboratedExpr (TFunction a b) -> CoreElaboratedExpr a -> CoreElaboratedExpr b
   CELet :: SWeedType a -> IdentifierName -> CoreElaboratedExpr a -> CoreElaboratedExpr b -> CoreElaboratedExpr b
   CELetRec :: [Declaration SomeCoreElaboratedExpr] -> CoreElaboratedExpr c -> CoreElaboratedExpr c
   CEIf :: CoreElaboratedExpr TBool -> CoreElaboratedExpr a -> CoreElaboratedExpr a -> CoreElaboratedExpr a
-  CEIfDice :: CoreElaboratedExpr (TDice TBool) -> CoreElaboratedExpr (TDice a) -> CoreElaboratedExpr (TDice a) -> CoreElaboratedExpr (TDice a)
-  CEIfPool :: CoreElaboratedExpr (TPool TBool) -> CoreElaboratedExpr (TPool a) -> CoreElaboratedExpr (TPool a) -> CoreElaboratedExpr (TPool a)
+  CEIfDice :: CoreElaboratedExpr (TApp TDice TBool) -> CoreElaboratedExpr (TApp TDice a) -> CoreElaboratedExpr (TApp TDice a) -> CoreElaboratedExpr (TApp TDice a)
+  CEIfPool :: CoreElaboratedExpr (TApp TPool TBool) -> CoreElaboratedExpr (TApp TPool a) -> CoreElaboratedExpr (TApp TPool a) -> CoreElaboratedExpr (TApp TPool a)
 data SomeCoreElaboratedExpr = forall t. SomeCoreElaboratedExpr (SWeedType t) (CoreElaboratedExpr t)
 
 getType :: CoreTypedExpr -> WeedType

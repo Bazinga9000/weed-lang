@@ -81,9 +81,9 @@ instance Arbitrary WeedType where
             b <- genType (n `div` 2)
             elements
               [ TFunction a b
-              , TList a
-              , TDice a
-              , TPool a
+              , TApp TList a
+              , TApp TDice a
+              , TApp TPool a
               ]
         ]
 
@@ -98,70 +98,70 @@ typeCheckerTests =
           testCase "Bool literal types as TBool" $
             assertType (CUBool True) TBool,
           testCase "List inference correctly extracts list type ([1, 2, 3])" $
-            assertType (CUList [CUNumber 1, CUNumber 2, CUNumber 3]) (TList TNumber),
+            assertType (CUList [CUNumber 1, CUNumber 2, CUNumber 3]) (TApp TList TNumber),
           testCase "List inference fails on heterogeneous lists" $
             assertTypeError (CUList [CUNumber 1, CUBool True])
         ],
       testGroup
         "Primitive Dice & Pools"
         [ testCase "d6 -> Dice Number" $
-            assertType d6 (TDice TNumber),
+            assertType d6 (TApp TDice TNumber),
           testCase "4d6 (Poolify replication) -> Pool Number" $
-            assertType pool4d6 (TPool TNumber)
+            assertType pool4d6 (TApp TPool TNumber)
         ],
       testGroup
         "Implicit Coercions (Binary Operations)"
         [ testCase "d6 + d10 -> Dice Number (Implicit Applicative <*>)" $
-            assertType (CUApply (CUApply add d6) d10) (TDice TNumber),
+            assertType (CUApply (CUApply add d6) d10) (TApp TDice TNumber),
           testCase "d6 + 5 -> Dice Number (Implicit Fmap & Scalar Promotion)" $
-            assertType (CUApply (CUApply add d6) (CUNumber 5)) (TDice TNumber),
+            assertType (CUApply (CUApply add d6) (CUNumber 5)) (TApp TDice TNumber),
           testCase "4d6 + 5 -> Dice Number (Pool Collapse & Scalar Promotion)" $
-            assertType (CUApply (CUApply add pool4d6) (CUNumber 5)) (TDice TNumber),
+            assertType (CUApply (CUApply add pool4d6) (CUNumber 5)) (TApp TDice TNumber),
           testCase "4d6 + d10 -> Dice Number (Pool Collapse & Implicit Applicative)" $
-            assertType (CUApply (CUApply add pool4d6) d10) (TDice TNumber),
+            assertType (CUApply (CUApply add pool4d6) d10) (TApp TDice TNumber),
           testCase "4d6 + 4d6 -> Dice Number (Pool Collapse & Implicit Applicative)" $
-            assertType (CUApply (CUApply add pool4d6) pool4d6) (TDice TNumber)
+            assertType (CUApply (CUApply add pool4d6) pool4d6) (TApp TDice TNumber)
         ],
       testGroup
         "Pool Operations"
         [ testCase "sum 4d6 -> Dice Number (Pool Mapping / Collapse)" $
-            assertType (CUApply (CUIdentifier (B Sum)) pool4d6) (TDice TNumber)
+            assertType (CUApply (CUIdentifier (B Sum)) pool4d6) (TApp TDice TNumber)
         ],
       testGroup
         "If Expressions"
         [ testCase "if True then 1 else 2 -> Number (If - Basic)" $
             assertType (CUIf (CUBool True) (CUNumber 1) (CUNumber 2)) TNumber,
           testCase "if coin then 1 else 2 -> Dice Number (If - Double Scalar Promotion - Dice)" $
-            assertType (CUIf coin (CUNumber 1) (CUNumber 2)) (TDice TNumber),
+            assertType (CUIf coin (CUNumber 1) (CUNumber 2)) (TApp TDice TNumber),
           testCase "if 4coin then 1 else 2 -> Pool Number (If - Double Scalar Promotion - Pool)" $
-            assertType (CUIf pool4coin (CUNumber 1) (CUNumber 2)) (TPool TNumber),
+            assertType (CUIf pool4coin (CUNumber 1) (CUNumber 2)) (TApp TPool TNumber),
           testCase "if coin then d6 else 0 -> Dice Number (If - One-Sided Scalar Promotion - Dice)" $
-            assertType (CUIf coin d6 (CUNumber 0)) (TDice TNumber),
+            assertType (CUIf coin d6 (CUNumber 0)) (TApp TDice TNumber),
           testCase "if coin then 4d6 else 5 -> Dice Number (If - Simultaneous Promotion / Collapse)" $
-            assertType (CUIf coin pool4d6 (CUNumber 5)) (TDice TNumber)
+            assertType (CUIf coin pool4d6 (CUNumber 5)) (TApp TDice TNumber)
         ],
       testGroup
         "Explicit Monadic Operations (fmap, ap, bind)"
         [ testCase "map (+5) [1, 2, 3] -> List Number" $
             assertType
               (cuMap (CUApply add (CUNumber 5)) (CUList [CUNumber 1, CUNumber 2, CUNumber 3]))
-              (TList TNumber),
+              (TApp TList TNumber),
           testCase "map (+5) d6 -> Dice Number" $
             assertType
               (cuMap (CUApply add (CUNumber 5)) d6)
-              (TDice TNumber),
+              (TApp TDice TNumber),
           testCase "map (+5) 4d6 -> Pool Number" $
             assertType
               (cuMap (CUApply add (CUNumber 5)) pool4d6)
-              (TPool TNumber),
+              (TApp TPool TNumber),
           testCase "ap (map (+) d6) d10 -> Dice Number" $
             assertType
               (cuAp (cuMap add d6) d10)
-              (TDice TNumber),
+              (TApp TDice TNumber),
           testCase "bind d6 (const d10) -> Dice Number" $
             assertType
               (cuBind d6 (CULambda idX d10))
-              (TDice TNumber),
+              (TApp TDice TNumber),
           testCase "map (+5) 10 -> Type Error" $
             assertTypeError
               (cuMap (CUApply add (CUNumber 5)) (CUNumber 10)),
@@ -172,19 +172,19 @@ typeCheckerTests =
             "bind (return 5) (\\x -> d6) -> Dice Number"
             $ assertType
               (cuBind (cuReturn (CUNumber 5)) (CULambda idX d6))
-              (TDice TNumber),
+              (TApp TDice TNumber),
           testCase "bind (return 5) (\\x -> 4d6) -> Pool Number" $
             assertType
               (cuBind (cuReturn (CUNumber 5)) (CULambda idX pool4d6))
-              (TPool TNumber),
+              (TApp TPool TNumber),
           testCase "ap (return (+5)) d10 -> Dice Number" $
             assertType
               (cuAp (cuReturn (CUApply add (CUNumber 5))) d10)
-              (TDice TNumber),
+              (TApp TDice TNumber),
           testCase "[return 5, d6] -> List (Dice Number)" $
             assertType
               (CUList [cuReturn (CUNumber 5), d6])
-              (TList (TDice TNumber)),
+              (TApp TList (TApp TDice TNumber)),
           testCase "return 5 -> Type Error (Contextless return)" $
             assertTypeError
               (cuReturn (CUNumber 5))

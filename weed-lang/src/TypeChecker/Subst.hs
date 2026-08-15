@@ -42,25 +42,19 @@ instance Substitutable WeedType where
   apply _ TBool = TBool
   apply _ TUnit = TUnit
   apply s (TFunction a b) = TFunction (apply s a) (apply s b)
-  apply s (TList a) = TList (apply s a)
-  apply s (TDice a) = TDice (apply s a)
-  apply s (TPool a) = TPool (apply s a)
+  apply _ TList = TList
+  apply _ TDice = TDice
+  apply _ TPool = TPool
   apply s v@(TVar n) = Map.findWithDefault v n s
-  -- contract applications of constructor bindings (see TDummyArg):
-  -- TApp (TList TDummyArg) a is TList a, etc.
-  apply s (TApp a b) = case (apply s a, apply s b) of
-    (TList TDummyArg, b') -> TList b'
-    (TDice TDummyArg, b') -> TDice b'
-    (TPool TDummyArg, b') -> TPool b'
-    (a', b') -> TApp a' b'
+  apply s (TApp a b) = TApp (apply s a) (apply s b)
 
   ftv TNumber = Set.empty
   ftv TBool = Set.empty
   ftv TUnit = Set.empty
   ftv (TFunction a b) = ftv a `Set.union` ftv b
-  ftv (TList a) = ftv a
-  ftv (TDice a) = ftv a
-  ftv (TPool a) = ftv a
+  ftv TList = Set.empty
+  ftv TDice = Set.empty
+  ftv TPool = Set.empty
   ftv (TVar n) = one n
   ftv (TApp a b) = ftv a `Set.union` ftv b
 

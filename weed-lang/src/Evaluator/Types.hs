@@ -63,10 +63,10 @@ data Value :: WeedType -> Type where
   VNumber :: WeedNumber -> Value TNumber
   VBool :: Bool -> Value TBool
   VUnit :: Value TUnit
-  VList :: DropList (Value a) -> Value (TList a)
+  VList :: DropList (Value a) -> Value (TApp TList a)
   VClosure :: Env -> SWeedType a -> IdentifierName -> CoreElaboratedExpr b -> Value (TFunction a b)
   VBuiltin :: TypedFun a b -> Value (TFunction a b)
-  VDice :: Roll (Value a) -> Value (TDice a)
-  VPool :: Roll (DropList (Value a)) -> Roll (Value a) -> Value (TPool a)
+  VDice :: Roll (Value a) -> Value (TApp TDice a)
+  VPool :: Roll (DropList (Value a)) -> Roll (Value a) -> Value (TApp TPool a)
 
 data SomeValue = forall t. SomeValue (SWeedType t) (Value t)

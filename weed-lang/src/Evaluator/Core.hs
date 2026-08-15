@@ -144,9 +144,9 @@ sample (SomeValue s v) = case v of
       Left err -> Left err
       Right v' -> Right $ SomeValue (STList (poolElement s)) (VList v')
   where
-    diceElement :: SWeedType (TDice a) -> SWeedType a
+    diceElement :: SWeedType (TApp TDice a) -> SWeedType a
     diceElement (STDice s') = s'
-    poolElement :: SWeedType (TPool a) -> SWeedType a
+    poolElement :: SWeedType (TApp TPool a) -> SWeedType a
     poolElement (STPool s') = s'
 
 evaluate :: FetchBuiltin -> CoreTypedExpr -> IO (Either EvaluationError SomeValue)

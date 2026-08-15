@@ -8,9 +8,9 @@ data SWeedType :: WeedType -> Type where
   STBool     :: SWeedType TBool
   STUnit     :: SWeedType TUnit
   STFunction :: SWeedType a -> SWeedType b -> SWeedType (TFunction a b)
-  STList     :: SWeedType a -> SWeedType (TList a)
-  STDice     :: SWeedType a -> SWeedType (TDice a)
-  STPool     :: SWeedType a -> SWeedType (TPool a)
+  STList     :: SWeedType a -> SWeedType (TApp TList a)
+  STDice     :: SWeedType a -> SWeedType (TApp TDice a)
+  STPool     :: SWeedType a -> SWeedType (TApp TPool a)
 
 data SomeSWeedType = forall t. SomeSWeedType (SWeedType t)
 
@@ -22,15 +22,18 @@ toSingleton (TFunction a b) = do
   (SomeSWeedType a') <- toSingleton a
   (SomeSWeedType b') <- toSingleton b
   return $ SomeSWeedType (STFunction a' b')
-toSingleton (TList a) = do
+toSingleton (TApp TList a) = do
   (SomeSWeedType a') <- toSingleton a
   return $ SomeSWeedType (STList a')
-toSingleton (TDice a) = do
+toSingleton (TApp TDice a) = do
   (SomeSWeedType a') <- toSingleton a
   return $ SomeSWeedType (STDice a')
-toSingleton (TPool a) = do
+toSingleton (TApp TPool a) = do
   (SomeSWeedType a') <- toSingleton a
   return $ SomeSWeedType (STPool a')
+toSingleton TList = Nothing
+toSingleton TDice = Nothing
+toSingleton TPool = Nothing
 toSingleton (TVar _) = Nothing
 toSingleton (TApp _ _) = Nothing
 
@@ -39,9 +42,9 @@ fromSingleton STNumber = TNumber
 fromSingleton STBool = TBool
 fromSingleton STUnit = TUnit
 fromSingleton (STFunction a b) = TFunction (fromSingleton a) (fromSingleton b)
-fromSingleton (STList a) = TList (fromSingleton a)
-fromSingleton (STDice a) = TDice (fromSingleton a)
-fromSingleton (STPool a) = TPool (fromSingleton a)
+fromSingleton (STList a) = TApp TList (fromSingleton a)
+fromSingleton (STDice a) = TApp TDice (fromSingleton a)
+fromSingleton (STPool a) = TApp TPool (fromSingleton a)
 
 instance TestEquality SWeedType where
   testEquality STNumber STNumber = Just Refl

@@ -73,16 +73,16 @@ tNum :: WeedType
 tNum = TNumber
 
 tListNum :: WeedType
-tListNum = TList TNumber
+tListNum = TApp TList TNumber
 
 tFuncNumList :: WeedType
 tFuncNumList = TFunction TNumber tListNum
 
 tDiceNum :: WeedType
-tDiceNum = TDice tNum
+tDiceNum = TApp TDice tNum
 
 tPoolNum :: WeedType
-tPoolNum = TPool tNum
+tPoolNum = TApp TPool tNum
 
 idX :: IdentifierName
 idX = S "x"
@@ -91,9 +91,9 @@ mkHiLoTest :: Builtin -> String -> [Integer] -> [Bool] -> Integer -> TestTree
 mkHiLoTest hiLo name input output n = testCase name $ do
   let listArgs = CTList tListNum (map cNum input)
   let expected = vList STBool (map VBool output)
-  let predicateT = tListNum ->> TList TBool
+  let predicateT = tListNum ->> TApp TList TBool
   let builtinT = TNumber ->> predicateT
-  let expr = CTApply (TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs
+  let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs
   assertEval expr expected
 
 evaluatorTests :: TestTree
@@ -115,7 +115,7 @@ evaluatorTests =
           testCase "[const 8, const 9] <*> [1, 2] -> [8, 8, 9, 9]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2]
 
-            let lFuncT = TList (TFunction TNumber TNumber)
+            let lFuncT = TApp TList (TFunction TNumber TNumber)
 
             let func1 = CTLambda (TFunction TNumber TNumber) idX (cNum 8)
             let func2 = CTLambda (TFunction TNumber TNumber) idX (cNum 9)
@@ -127,7 +127,7 @@ evaluatorTests =
           testCase "[_ + 1, _ + 2] <*> [5, 10] -> [6, 11, 7, 12]" $ do
             let listArgs = CTList tListNum [cNum 5, cNum 10]
 
-            let lFuncT = TList (TFunction TNumber TNumber)
+            let lFuncT = TApp TList (TFunction TNumber TNumber)
             let ctAdd = CTIdentifier (TNumber ->> TNumber ->> TNumber) (B Add)
 
             let func1Body = CTApply TNumber (CTApply (TNumber ->> TNumber) ctAdd (CTIdentifier TNumber idX)) (cNum 1)
@@ -160,10 +160,10 @@ evaluatorTests =
             assertEval expr (vList STNumber [VNumber (literal 1), VNumber (literal 1), VNumber (literal 2), VNumber (literal 2)]),
           testCase "liftMask (_ == 1) [1, 2, 3] -> [True, False, False]" $ do
             let listArgs = CTList tListNum [cNum 1, cNum 2, cNum 3]
-            let predicateT = tListNum ->> TList TBool
+            let predicateT = tListNum ->> TApp TList TBool
             let liftMaskT = (TNumber ->> TBool) ->> predicateT
             let selectorFunc = CTApply (TFunction TNumber TBool) (CTIdentifier (TFunction TNumber (TFunction TNumber TBool)) (B Eq)) (cNum 1)
-            let expr = CTApply (TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs
+            let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier liftMaskT (B LiftMask)) selectorFunc) listArgs
             assertEval expr (vList STBool [VBool True, VBool False, VBool False]),
           mkHiLoTest Highest "highest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, False, True, False, False, False, True, True, False, False, False, False] 3,
           mkHiLoTest Lowest "lowest is correct (unique)" [49, 16, 100, 45, 25, 60, 87, 81, 30, 34, 21, 56] [False, True, False, False, True, False, False, False, False, False, True, False] 3,
@@ -217,13 +217,13 @@ evaluatorTests =
             let expr = CTIf tNum (CTBool True) (cNum 1) (cNum 2)
             assertEval expr (vNum 1),
           testCase "if coin then 1 else 2 -> Evaluates (Dice Context)" $ do
-            let tDiceBool = TDice TBool
+            let tDiceBool = TApp TDice TBool
             let coinE = CTIdentifier tDiceBool (B DiceCoin)
             let expr = CTIf tDiceNum coinE (cReturn tDiceNum (cNum 1)) (cReturn tDiceNum (cNum 2))
             assertNoError expr,
           testCase "if 4coin then 1 else 2 -> Evaluates (Pool Context)" $ do
-            let tDiceBool = TDice TBool
-            let tPoolBool = TPool TBool
+            let tDiceBool = TApp TDice TBool
+            let tPoolBool = TApp TPool TBool
 
             let poolifyT = TNumber ->> tDiceBool ->> tPoolBool
             let poolifyE = CTIdentifier poolifyT (B Poolify)
@@ -236,7 +236,7 @@ evaluatorTests =
             let expr = CTIf tPoolNum fourCoin (cReturn tPoolNum (cNum 1)) (cReturn tPoolNum (cNum 2))
             assertNoError expr,
           testCase "if coin then d6 else 0 -> Evaluates (Dice Context - Simultaneous Promotion)" $ do
-            let tDiceBool = TDice TBool
+            let tDiceBool = TApp TDice TBool
             let coinE = CTIdentifier tDiceBool (B DiceCoin)
 
             let d6E =
