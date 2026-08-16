@@ -475,7 +475,7 @@ In these examples, #sym.suit.spade and #sym.suit.heart will represent fresh vari
   "PositiveReal -> Dice PositiveReal",
   "Dice Primitive",
 )[
-  A Pareto die. `pareto x` samples the Pareto distribution with shape parameter $alpha = 0$.
+  A Pareto die. `pareto x` samples the Pareto distribution with shape parameter $alpha$.
 
   This die never crits nor fails.
 ]
@@ -803,7 +803,7 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   examples: [
     ```haskell
     [1, 2, 3, 4, 5] | sum -- 15
-    [1, 2, 3, 4, 5] | sum -- 12
+    [4, 4, 4] | sum -- 12
     ```
   ],
 )[
