@@ -76,7 +76,10 @@ refineTokens (TokenNum n : TokenIdent s : ts)
 refineTokens (TokenIdent s : ts) = case parseConcatDie s of
   -- dice (bare "d", or concatenated "d6", "d100", "d%")
   Just (dieBlt, sides) ->
-      TokenBuiltin dieBlt : (if null sides then id else (TokenNum (parseTN sides) :)) (refineTokens ts)
+    -- wrap in parens similarly to the pool case for the same reason
+    if null sides
+      then TokenBuiltin dieBlt : refineTokens ts
+      else TokenLParen : TokenBuiltin dieBlt : TokenNum (parseTN sides) : TokenRParen : refineTokens ts
   -- just an identifier
   Nothing -> TokenIdent s : refineTokens ts
 
