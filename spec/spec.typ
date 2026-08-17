@@ -282,7 +282,7 @@ Multiboolean metadata can apply one of two marks depending on whether some or al
 
   [Reroll],
   [#mbacc("Reroll")],
-  [`reroll`],
+  [`reroll`, `rerollOnce`],
   [
     Stores whether or not a die has been rerolled
 
@@ -757,6 +757,25 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 
 #builtin(
   "reroll",
+  "Rollable r => (a -> Bool) -> r a -> r a",
+  "Dice Modifiers",
+  examples: [
+    ```hs
+    4d6 | reroll (== 1) -- will only ever produce 2-6
+    ```
+
+  ],
+)[
+  Rerolls a die (or all dice in a Pool) that satisfy the predicate repeatedly until they do not.
+
+  Adds Reroll metadata (whether the die was rerolled or not) to all affected output values.
+
+  Note that this does *not* take general `Selector` because most global predicates would loop forever.
+]
+
+
+#builtin(
+  "rerollOnce",
   "Rollable r, Selector a s => s -> r a -> r a",
   "Dice Modifiers",
   examples: [
@@ -766,7 +785,7 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 
   ],
 )[
-  Rerolls a die (or all dice in a Pool) that satisfy the `Selector` repeatedly until they do not.
+  Rerolls a die (or all dice in a Pool) that satisfy the `Selector` *once*.
 
   Adds Reroll metadata (whether the die was rerolled or not) to all affected output values.
 ]

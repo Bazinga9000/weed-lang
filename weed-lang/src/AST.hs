@@ -70,6 +70,8 @@ data Builtin -- unary operators
   | Keep
   | Drop
   | Explode
+  | Reroll
+  | RerollOnce
   | Approximate
   | -- list operations
     Highest

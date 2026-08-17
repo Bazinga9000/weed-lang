@@ -150,6 +150,21 @@ builtinType Explode = do
   let ta = TVar a
       tr = TVar r
   return $ ForAll [a, r] [CInstanceOf $ CRollable tr] ((ta ->> TBool) ->> TApp tr ta ->> TApp TPool ta)
+builtinType Reroll = do
+  a <- fresh
+  r <- fresh
+  let ta = TVar a
+      tr = TVar r
+  return $ ForAll [a, r] [CInstanceOf $ CRollable tr] ((ta ->> TBool) ->> TApp tr ta ->> TApp tr ta)
+builtinType RerollOnce = do
+  s <- fresh
+  a <- fresh
+  r <- fresh
+  let ts = TVar s
+      ta = TVar a
+      tr = TVar r
+  return $ ForAll [s, a, r] [CInstanceOf $ CRollable tr, CInstanceOf $ CSelector ta ts] (ts ->> TApp tr ta ->> TApp tr ta)
+
 builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
 builtinType Highest = return $ noPoly (TNumber ->> TApp TList TNumber ->> TApp TList TBool)
 builtinType Lowest = return $ noPoly (TNumber ->> TApp TList TNumber ->> TApp TList TBool)

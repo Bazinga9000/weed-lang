@@ -223,6 +223,8 @@ builtinEnv =
     ("sum", Sum),
     ("keep", Keep),
     ("drop", Drop),
+    ("reroll", Reroll),
+    ("rerollOnce", RerollOnce),
     ("explode", Explode),
     ("approximate", Approximate),
     ("highest", Highest),

@@ -321,13 +321,80 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STPool s
           return $ VPool pool' src
     _ -> throwError $ InterpreterBug "Explode: type mismatch"
 
+-- reroll
+fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STDice sda) (STDice sdb))) Reroll =
+  case testEquality sa sda of
+    Just Refl -> case testEquality sda sdb of
+      Just Refl ->
+        return $ VBuiltin $ TypedFun (STFunction sa STBool) (STFunction (STDice sda) (STDice sdb)) $ \predicate ->
+          return $ VBuiltin $ TypedFun (STDice sda) (STDice sdb) $ \(VDice dice) -> do
+            rd <- localReroll True predicate dice
+            return $ VDice rd
+      Nothing -> throwError $ InterpreterBug "Reroll: element type mismatch"
+    Nothing -> throwError $ InterpreterBug "Reroll: predicate type mismatch"
+fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STPool spa) (STPool spb))) Reroll =
+  case testEquality sa spa of
+    Just Refl -> case testEquality spa spb of
+      Just Refl ->
+        return $ VBuiltin $ TypedFun (STFunction sa STBool) (STFunction (STPool spa) (STPool spb)) $ \predicate ->
+          return $ VBuiltin $ TypedFun (STPool spa) (STPool spb) $ \(VPool pool src) -> do
+            rdPool <- poolLocalReroll True predicate pool src
+            return $ VPool rdPool src
+      Nothing -> throwError $ InterpreterBug "Reroll: element type mismatch"
+    Nothing -> throwError $ InterpreterBug "Reroll: predicate type mismatch"
+
+-- rerollOnce
+fetchBuiltinHigherOrder (STFunction sel (STFunction (STDice sda) (STDice sdb))) RerollOnce =
+  case testEquality sda sdb of
+    Just Refl -> case sel of
+      STFunction sa STBool -> case testEquality sa sda of
+        Just Refl ->
+          return $ VBuiltin $ TypedFun sel (STFunction (STDice sda) (STDice sdb)) $ \predicate ->
+            return $ VBuiltin $ TypedFun (STDice sda) (STDice sdb) $ \(VDice dice) -> do
+              rd <- localReroll False predicate dice
+              return $ VDice rd
+        Nothing -> throwError $ InterpreterBug "RerollOnce: predicate type mismatch"
+      STFunction (STList sa) (STList STBool) -> case testEquality sa sda of
+        Just Refl ->
+          return $ VBuiltin $ TypedFun sel (STFunction (STDice sda) (STDice sdb)) $ \predicate ->
+            return $ VBuiltin $ TypedFun (STDice sda) (STDice sdb) $ \(VDice dice) -> do
+              rd <- globalReroll predicate (one <$> dice) dice
+              return $ VDice $ dropListSingle rd
+        Nothing -> throwError $ InterpreterBug "RerollOnce: predicate type mismatch"
+      _ -> throwError $ InterpreterBug "RerollOnce: bad selector"
+    Nothing -> throwError $ InterpreterBug "RerollOnce: element type mismatch"
+fetchBuiltinHigherOrder (STFunction sel (STFunction (STPool spa) (STPool spb))) RerollOnce =
+  case testEquality spa spb of
+    Just Refl -> case sel of
+      STFunction sa STBool -> case testEquality sa spa of
+        Just Refl ->
+          return $ VBuiltin $ TypedFun sel (STFunction (STPool spa) (STPool spb)) $ \predicate ->
+            return $ VBuiltin $ TypedFun (STPool spa) (STPool spb) $ \(VPool pool src) -> do
+              rdPool <- poolLocalReroll False predicate pool src
+              return $ VPool rdPool src
+        Nothing -> throwError $ InterpreterBug "RerollOnce: predicate type mismatch"
+      STFunction (STList sa) (STList STBool) -> case testEquality sa spa of
+        Just Refl ->
+          return $ VBuiltin $ TypedFun sel (STFunction (STPool spa) (STPool spb)) $ \predicate ->
+            return $ VBuiltin $ TypedFun (STPool spa) (STPool spb) $ \(VPool pool src) -> do
+              rdPool <- globalReroll predicate pool src
+              return $ VPool rdPool src
+        Nothing -> throwError $ InterpreterBug "RerollOnce: predicate type mismatch"
+      _ -> throwError $ InterpreterBug "RerollOnce: bad selector"
+    Nothing -> throwError $ InterpreterBug "RerollOnce: element type mismatch"
+
 fetchBuiltinHigherOrder _ b =
   throwError $ InterpreterBug $ "fetchBuiltinHigherOrder: not implemented or wrong type: " <> prettyPrint b
 
--- | Mark a number as an extra die (from explode). Non-numbers pass through.
+-- mark a number as an extra die (for explode). non-numbers pass through.
 freshExtra :: Value a -> Value a
 freshExtra (VNumber n) = VNumber $ (metadata . _Just . extraDice) .~ Multibool (1, 0) $ n
 freshExtra v = v
+
+-- mark a number as rerolled. non-numbers pass through.
+markRerolled :: Value a -> Value a
+markRerolled (VNumber n) = VNumber $ (metadata . _Just . reroll) .~ Multibool (1, 0) $ n
+markRerolled v = v
 
 -- | Convert a selector (a -> Bool or [a] -> [Bool]) into a mask function
 -- [a] -> [Bool] running in 'Roll'.
@@ -381,6 +448,62 @@ mkKeepDropPool blt sel sa = VBuiltin $ TypedFun sel (STFunction (STPool sa) (STP
   maskFn <- runLiftMask fb env sel sa predicate
   return $ VBuiltin $ TypedFun (STPool sa) (STPool sa) $ \(VPool pool src) ->
     keepDropPool blt maskFn pool src
+
+-- reroll a single die: sample from the die, and if the (local) predicate holds,
+-- resample (marked rerolled), repeating if 'recurse' is set, until it fails.
+localReroll :: Bool -> Value (TFunction a TBool) -> Roll (Value a) -> Eval (Roll (Value a))
+localReroll recurse rerollPred dice = do
+  env <- askVars
+  fb <- askFetchBuiltin
+  return $ dice >>= go env fb
+  where
+    go env fb v = do
+      r <- applyValueRoll fb env rerollPred v
+      case r of
+        VBool True -> do
+          new <- markRerolled <$> dice
+          if recurse then go env fb new else return new
+        VBool False -> return v
+
+-- reroll each element of a pool that satisfies a *local* predicate, resampling
+-- from the pool's source. The source itself is left unchanged
+poolLocalReroll :: Bool -> Value (TFunction a TBool) -> Roll (DropList (Value a)) -> Roll (Value a) -> Eval (Roll (DropList (Value a)))
+poolLocalReroll recurse rerollPred pool src = do
+  env <- askVars
+  fb <- askFetchBuiltin
+  return $ pool >>= mapMDropList (go env fb)
+  where
+    go env fb v = do
+      r <- applyValueRoll fb env rerollPred v
+      case r of
+        VBool True -> do
+          new <- markRerolled <$> src
+          if recurse then go env fb new else return new
+        VBool False -> return v
+
+-- reroll the elements of a pool that satisfies a *global* selector
+globalReroll :: Value (TFunction (TApp TList a) (TApp TList TBool)) -> Roll (DropList (Value a)) -> Roll (Value a) -> Eval (Roll (DropList (Value a)))
+globalReroll rerollPred pool source = do
+  env <- askVars
+  fb <- askFetchBuiltin
+  return $ do
+    values <- pool
+    flags <- applyValueRoll fb env rerollPred (VList values)
+    case flags of
+      VList l -> do
+        let zipF v p = case p of
+              VBool True -> markRerolled <$> source
+              VBool False -> return v
+        zipWithMDropList zipF values l
+
+-- extract a single element from a one-element pool (for use with global selectors on dice)
+dropListSingle :: Roll (DropList (Value a)) -> Roll (Value a)
+dropListSingle rd = do
+  dl <- rd
+  case getKept dl of
+    [v] -> return v
+    _ -> throwError $ InterpreterBug "dropListSingle: expected exactly one kept element"
+
 
 -- highest/lowest helper
 mkHiLo :: Builtin -> Bool -> Value (TFunction TNumber (TFunction (TApp TList TNumber) (TApp TList TBool)))

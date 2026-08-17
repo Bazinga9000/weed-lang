@@ -45,7 +45,8 @@ data NumberMetadata = NumberMetadata
   {
     _critLevel :: Multibool,
     _failLevel :: Multibool,
-    _extraDice :: Multibool
+    _extraDice :: Multibool,
+    _reroll :: Multibool
   }
   deriving (Eq, Show)
 
@@ -57,7 +58,8 @@ instance Semigroup NumberMetadata where
       {
         _critLevel = _critLevel a <> _critLevel b,
         _failLevel = _failLevel a <> _failLevel b,
-        _extraDice = _extraDice a <> _extraDice b
+        _extraDice = _extraDice a <> _extraDice b,
+        _reroll = _reroll a <> _reroll b
       }
 
 instance Monoid NumberMetadata where
@@ -66,5 +68,6 @@ instance Monoid NumberMetadata where
       {
         _critLevel = mempty,
         _failLevel = mempty,
-        _extraDice = mempty
+        _extraDice = mempty,
+        _reroll = mempty
       }

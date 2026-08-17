@@ -13,11 +13,12 @@ colorMetadata m
   | otherwise = Nothing
 
 markMetadata :: NumberMetadata -> Text
-markMetadata m = critSuccessMark <> critFailMark <> extraMark
+markMetadata m = critSuccessMark <> critFailMark <> extraMark <> rerollMark
   where
     critSuccessMark = mkMark ("☆", "★") (m ^. critLevel)
     critFailMark = mkMark ("†", "‡") (m ^. failLevel)
     extraMark = mkMark ("⊕", "⊕") (m ^. extraDice)
+    rerollMark = mkMark ("↻", "↻") (m ^. reroll)
 
 formatWithMetadata :: NumberMetadata -> Text -> Text
 formatWithMetadata md inText = case colorMetadata md of

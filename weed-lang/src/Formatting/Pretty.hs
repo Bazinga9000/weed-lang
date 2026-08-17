@@ -89,6 +89,8 @@ instance Pretty Builtin where
   prettyPrint Keep = "keep"
   prettyPrint Drop = "drop"
   prettyPrint Explode = "explode"
+  prettyPrint Reroll = "reroll"
+  prettyPrint RerollOnce = "rerollOnce"
   prettyPrint Approximate = "approximate"
   prettyPrint Highest = "highest"
   prettyPrint Lowest = "lowest"
