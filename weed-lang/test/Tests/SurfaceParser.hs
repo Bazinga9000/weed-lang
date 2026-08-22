@@ -5,6 +5,7 @@ import Parser.Lexer (Token (..))
 import Parser.SurfaceParser (parseSurface)
 import Test.Tasty
 import Test.Tasty.HUnit
+import Tests.Common
 
 -- no parser tests check for parse errors right now,
 -- so we shim this
@@ -12,12 +13,6 @@ parse :: [Token] -> SurfaceExpr
 parse toks = case parseSurface toks of
   Left e -> error $ show e
   Right se -> se
-
-sMap :: SurfaceExpr -> SurfaceExpr -> SurfaceExpr
-sMap f = SApply (SApply (SIdentifier (S "map")) f)
-
-sLet1 :: IdentifierName -> SurfaceExpr -> SurfaceExpr -> SurfaceExpr
-sLet1 ident binding = SLetRec [Decl ident binding]
 
 surfaceParserTests :: TestTree
 surfaceParserTests =

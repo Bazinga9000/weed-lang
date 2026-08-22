@@ -2,64 +2,14 @@
 module Tests.TypeChecker (typeCheckerTests) where
 
 import AST
-import Formatting.Pretty
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
+import Tests.Common
 import TypeChecker
 import TypeChecker.Types
 import TypeChecker.Singletons (SomeSWeedType(..), toSingleton, fromSingleton)
 import Prelude hiding (Ap, Identity, Sum)
-
-assertType :: CoreUntypedExpr -> WeedType -> Assertion
-assertType expr expectedType = case typeCheck expr of
-  Left err -> (assertFailure . toString) $ "Type checking failed with error: " <> prettyPrint err
-  Right typedExpr -> getType typedExpr @?= expectedType
-
-assertTypeError :: CoreUntypedExpr -> Assertion
-assertTypeError expr = case typeCheck expr of
-  Left _ -> pass
-  -- this one actually works without a toString because of inference! Yay!
-  Right typedExpr -> assertFailure $ "Expected type error, but succeeded with type: " <> show (getType typedExpr)
-
-d6 :: CoreUntypedExpr
-d6 = CUApply (CUIdentifier (B DiceD)) (CUNumber 6)
-
-d10 :: CoreUntypedExpr
-d10 = CUApply (CUIdentifier (B DiceD)) (CUNumber 10)
-
-pool4d6 :: CoreUntypedExpr
-pool4d6 = CUApply (CUApply (CUIdentifier (B Poolify)) (CUNumber 4)) d6
-
-add :: CoreUntypedExpr
-add = CUIdentifier (B Add)
-
-coin :: CoreUntypedExpr
-coin = CUIdentifier (B DiceCoin)
-
-pool4coin :: CoreUntypedExpr
-pool4coin = CUApply (CUApply (CUIdentifier (B Poolify)) (CUNumber 4)) coin
-
-idX :: IdentifierName
-idX = S "x"
-
-cuMap :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
-cuMap f = CUApply (CUApply (CUIdentifier (B Map)) f)
-
-cuAp :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
-cuAp f = CUApply (CUApply (CUIdentifier (B Ap)) f)
-
-cuBind :: CoreUntypedExpr -> CoreUntypedExpr -> CoreUntypedExpr
-cuBind f = CUApply (CUApply (CUIdentifier (B Bind)) f)
-
-cuReturn :: CoreUntypedExpr -> CoreUntypedExpr
-cuReturn = CUApply (CUIdentifier (B Return))
-
-cubId :: Builtin -> CoreUntypedExpr
-cubId = CUIdentifier . B
-
-cuId :: String -> CoreUntypedExpr
-cuId = CUIdentifier . S
 
 -- typeChecker internal tests
 
@@ -192,42 +142,7 @@ typeCheckerTests =
       testGroup
         "Mutual Recursion"
         [ testCase "even and odd infer to (Number -> Bool) and evaluate to Bool" $ do
-            let cuEvenCond = CUApply (CUApply (cubId Eq) (cuId "n")) (CUNumber 0)
-            let cuEvenBody = CUIf cuEvenCond (CUBool True) (CUApply (cuId "odd") (CUApply (CUApply (cubId Sub) (cuId "n")) (CUNumber 1)))
-
-            let cuOddCond = CUApply (CUApply (cubId Eq) (cuId "n")) (CUNumber 0)
-            let cuOddBody = CUIf cuOddCond (CUBool False) (CUApply (cuId "even") (CUApply (CUApply (cubId Sub) (cuId "n")) (CUNumber 1)))
-
-            let inputCU =
-                  CULetRec
-                    [ Decl (S "even") (CULambda (S "n") cuEvenBody),
-                      Decl (S "odd") (CULambda (S "n") cuOddBody)
-                    ]
-                    (CUApply (cuId "even") (CUNumber 4))
-
-            let tNumToBool = TNumber ->> TBool
-            let tNumToNum = TNumber ->> TNumber
-
-            let ctEq = CTIdentifier (TNumber ->> TNumber ->> TBool) (B Eq)
-            let ctSub = CTIdentifier (TNumber ->> TNumber ->> TNumber) (B Sub)
-
-            let ctEvenCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (CTNumber 0)
-            let ctEvenSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (CTNumber 1)
-            let ctEvenBody = CTIf TBool ctEvenCond (CTBool True) (CTApply TBool (CTIdentifier tNumToBool (S "odd")) ctEvenSub)
-
-            let ctOddCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (CTNumber 0)
-            let ctOddSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (CTNumber 1)
-            let ctOddBody = CTIf TBool ctOddCond (CTBool False) (CTApply TBool (CTIdentifier tNumToBool (S "even")) ctOddSub)
-
-            let expectedCT =
-                  CTLetRec
-                    TBool
-                    [ Decl (S "even") (CTLambda tNumToBool (S "n") ctEvenBody),
-                      Decl (S "odd") (CTLambda tNumToBool (S "n") ctOddBody)
-                    ]
-                    (CTApply TBool (CTIdentifier tNumToBool (S "even")) (CTNumber 4))
-
-            typeCheck inputCU @?= Right expectedCT
+            typeCheck evenOddCU @?= Right evenOddCT
         ],
       testGroup
         "Type Check Failures"

@@ -79,7 +79,8 @@ test-suite test-weed
                     , tasty-hunit
                     , tasty-quickcheck
                     , containers
-    other-modules:    Tests.Lexer
+    other-modules:    Tests.Common
+                    , Tests.Lexer
                     , Tests.SurfaceParser
                     , Tests.Lowerer
                     , Tests.TypeChecker

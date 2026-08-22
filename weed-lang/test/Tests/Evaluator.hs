@@ -1,100 +1,14 @@
 module Tests.Evaluator (evaluatorTests) where
 
 import AST
-import Evaluator
-import Evaluator.Types
+import Evaluator.Types (Value (..))
 import Evaluator.WeedNumber
-import Evaluator.DropList
-import Formatting.Pretty (prettyPrint)
 import Test.Tasty
 import Test.Tasty.HUnit
+import Tests.Common
 import TypeChecker.Singletons (SWeedType (..))
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
-
-eqObservable :: SomeValue -> SomeValue -> Bool
-eqObservable (SomeValue _ (VNumber a)) (SomeValue _ (VNumber b)) = a =~= b
-eqObservable (SomeValue _ (VBool a)) (SomeValue _ (VBool b)) = a == b
-eqObservable (SomeValue _ VUnit) (SomeValue _ VUnit) = True
-eqObservable (SomeValue (STList sa) (VList as)) (SomeValue (STList sb) (VList bs)) = length as' == length bs' && and (zipWith eqItem as' bs') where
-  as' = getKept as
-  bs' = getKept bs
-  eqItem a b = eqObservable (SomeValue sa a) (SomeValue sb b)
-eqObservable _ _ = False
-
--- eqError :: EvaluationError -> EvaluationError -> Bool
--- eqError (InterpreterBug s1) (InterpreterBug s2) = s1 == s2
--- eqError (TypeError t1 v1) (TypeError t2 v2) = t1 == t2 && v1 `eqObservable` v2
--- eqError (BadDieParameter b1 s1 v1) (BadDieParameter b2 s2 v2) = b1 == b2 && s1 == s2 && v1 `eqObservable` v2
--- eqError (DomainError b1) (DomainError b2) = b1 == b2
--- eqError _ _ = False
-
-assertEval :: CoreTypedExpr -> SomeValue -> Assertion
-assertEval expr expected = case evalPreSample expr of
-  Right actual ->
-    if actual `eqObservable` expected
-      then pass
-      else
-        (assertFailure . toString) ("Expected " <> prettyPrint expected <> ", got " <> prettyPrint actual)
-  Left err -> (assertFailure . toString) (prettyPrint err)
-
-assertNoError :: CoreTypedExpr -> Assertion
-assertNoError expr = case evalPreSample expr of
-  Right _ -> pass
-  Left err -> (assertFailure . toString) (prettyPrint err)
-
-vNum :: Integer -> SomeValue
-vNum n = SomeValue STNumber (VNumber (literal $ fromInteger n))
-
-vBool :: Bool -> SomeValue
-vBool b = SomeValue STBool (VBool b)
-
-vList :: SWeedType a -> [Value a] -> SomeValue
-vList s xs = SomeValue (STList s) (VList $ toDropList xs)
-
-cNum :: Integer -> CoreTypedExpr
-cNum n = CTNumber (fromInteger n)
-
--- used to build well-formed branches for effectful CTIf tests.
-cReturn :: WeedType -> CoreTypedExpr -> CoreTypedExpr
-cReturn containerT e =
-  CTApply containerT (CTIdentifier (getType e ->> containerT) (B Return)) e
-
--- emulate the skeleton of the AST CTMapPool
-cMapPool :: WeedType -> CoreTypedExpr -> CoreTypedExpr -> CoreTypedExpr
-cMapPool ty f p =
-  CTApply ty pa p
-  where
-    pa = CTApply (tp ->> ty) (CTIdentifier (tf ->> tp ->> ty) (B MapP)) f
-    tf = getType f
-    tp = getType p
-
-tNum :: WeedType
-tNum = TNumber
-
-tListNum :: WeedType
-tListNum = TApp TList TNumber
-
-tFuncNumList :: WeedType
-tFuncNumList = TFunction TNumber tListNum
-
-tDiceNum :: WeedType
-tDiceNum = TApp TDice tNum
-
-tPoolNum :: WeedType
-tPoolNum = TApp TPool tNum
-
-idX :: IdentifierName
-idX = S "x"
-
-mkHiLoTest :: Builtin -> String -> [Integer] -> [Bool] -> Integer -> TestTree
-mkHiLoTest hiLo name input output n = testCase name $ do
-  let listArgs = CTList tListNum (map cNum input)
-  let expected = vList STBool (map VBool output)
-  let predicateT = tListNum ->> TApp TList TBool
-  let builtinT = TNumber ->> predicateT
-  let expr = CTApply (TApp TList TBool) (CTApply predicateT (CTIdentifier builtinT (B hiLo)) (cNum n)) listArgs
-  assertEval expr expected
 
 evaluatorTests :: TestTree
 evaluatorTests =
@@ -252,28 +166,6 @@ evaluatorTests =
       testGroup
         "Recursive Evaluation"
         [ testCase "even 4 -> True (Pure LetRec Evaluation)" $ do
-            let tNumToBool = TNumber ->> TBool
-            let tNumToNum = TNumber ->> TNumber
-
-            let ctEq = CTIdentifier (TNumber ->> TNumber ->> TBool) (B Eq)
-            let ctSub = CTIdentifier (TNumber ->> TNumber ->> TNumber) (B Sub)
-
-            let ctEvenCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (cNum 0)
-            let ctEvenSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (cNum 1)
-            let ctEvenBody = CTIf TBool ctEvenCond (CTBool True) (CTApply TBool (CTIdentifier tNumToBool (S "odd")) ctEvenSub)
-
-            let ctOddCond = CTApply TBool (CTApply (TNumber ->> TBool) ctEq (CTIdentifier TNumber (S "n"))) (cNum 0)
-            let ctOddSub = CTApply TNumber (CTApply tNumToNum ctSub (CTIdentifier TNumber (S "n"))) (cNum 1)
-            let ctOddBody = CTIf TBool ctOddCond (CTBool False) (CTApply TBool (CTIdentifier tNumToBool (S "even")) ctOddSub)
-
-            let expr =
-                  CTLetRec
-                    TBool
-                    [ Decl (S "even") (CTLambda tNumToBool (S "n") ctEvenBody),
-                      Decl (S "odd") (CTLambda tNumToBool (S "n") ctOddBody)
-                    ]
-                    (CTApply TBool (CTIdentifier tNumToBool (S "even")) (cNum 4))
-
-            assertEval expr (vBool True)
+            assertEval evenOddCT (vBool True)
         ]
     ]
