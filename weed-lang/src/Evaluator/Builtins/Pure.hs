@@ -1,14 +1,15 @@
 module Evaluator.Builtins.Pure (fetchBuiltinPure) where
 
-import AST (Builtin (..))
+import AST (Builtin (..), MetaKind (..), AccessMode (..))
 import Control.Monad.Except
+import Evaluator.Metadata
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Formatting.Pretty (prettyPrint)
 import TypeChecker.Singletons
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
-import Control.Lens ((%~))
+import Control.Lens ((%~), (^.))
 import TowerNumber.Core (approximate)
 
 -- helpers to lift functions into values
@@ -47,4 +48,19 @@ fetchBuiltinPure (STFunction STBool (STFunction STBool STBool)) And = return $ l
 fetchBuiltinPure (STFunction STBool (STFunction STBool STBool)) Or = return $ liftBool2 (||)
 fetchBuiltinPure (STFunction STBool (STFunction STBool STBool)) Xor = return $ liftBool2 (/=)
 fetchBuiltinPure (STFunction STNumber STNumber) Approximate = return $ liftNumber (value %~ approximate)
+fetchBuiltinPure (STFunction STNumber STBool) (MetaAccess kind mode) = return $ metaAccessor kind mode
 fetchBuiltinPure _ b = throwError $ InterpreterBug $ "fetchBuiltinPure: not a pure builtin or wrong type: " <> prettyPrint b
+
+metaAccessor :: MetaKind -> AccessMode -> Value (TFunction TNumber TBool)
+metaAccessor kind mode = VBuiltin $ TypedFun STNumber STBool $ \(VNumber n) ->
+  case n ^. metadata of
+    Nothing -> return $ VBool False
+    Just md -> return $ VBool $ modePred mode (accessor kind md) where
+      accessor MKCrit = _critLevel
+      accessor MKFail = _failLevel
+      accessor MKReroll = _reroll
+      accessor MKExtra = _extraDice
+
+      modePred ASome = (== OneMark) . getMark
+      modePred AAll = hasTwoMarks
+      modePred AAny = hasMark

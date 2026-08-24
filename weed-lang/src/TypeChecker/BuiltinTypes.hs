@@ -166,6 +166,15 @@ builtinType RerollOnce = do
   return $ ForAll [s, a, r] [CInstanceOf $ CRollable tr, CInstanceOf $ CSelector ta ts] (ts ->> TApp tr ta ->> TApp tr ta)
 
 builtinType Approximate = return $ noPoly (TNumber ->> TNumber)
+builtinType (MetaAccess _ _) = return $ noPoly (TNumber ->> TBool)
+builtinType CritsOn = do
+  a <- fresh
+  let ta = TVar a
+  return $ ForAll [a] [] ((ta ->> TBool) ->> TApp TDice ta ->> TApp TDice ta)
+builtinType FailsOn = do
+  a <- fresh
+  let ta = TVar a
+  return $ ForAll [a] [] ((ta ->> TBool) ->> TApp TDice ta ->> TApp TDice ta)
 builtinType Highest = return $ noPoly (TNumber ->> TApp TList TNumber ->> TApp TList TBool)
 builtinType Lowest = return $ noPoly (TNumber ->> TApp TList TNumber ->> TApp TList TBool)
 builtinType Length = do

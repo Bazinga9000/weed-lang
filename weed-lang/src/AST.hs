@@ -73,11 +73,22 @@ data Builtin -- unary operators
   | Reroll
   | RerollOnce
   | Approximate
+  | -- metadata accessors
+    MetaAccess MetaKind AccessMode
+  | -- metadata modifiers
+    CritsOn
+  | FailsOn
   | -- list operations
     Highest
   | Lowest
   | Length
   deriving (Show, Eq, Ord)
+
+-- which metadata field an accessor targets.
+data MetaKind = MKCrit | MKFail | MKReroll | MKExtra deriving (Show, Eq, Ord)
+
+-- how to query a multibool: some (not all), all, or any.
+data AccessMode = ASome | AAll | AAny deriving (Show, Eq, Ord)
 
 data SurfaceExpr
   = SNumber TowerNumber

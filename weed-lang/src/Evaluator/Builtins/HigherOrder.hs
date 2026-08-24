@@ -1,7 +1,7 @@
 module Evaluator.Builtins.HigherOrder (fetchBuiltinHigherOrder) where
 
 import AST
-import Control.Lens ((.~), _Just)
+import Control.Lens ((.~), _Just, Lens')
 import Control.Monad.Except
 import Data.Type.Equality (testEquality, (:~:) (Refl))
 import Evaluator.Assertions
@@ -16,11 +16,11 @@ import TypeChecker.Singletons
 import TypeChecker.Types
 import Prelude hiding (Ap, Identity, Sum)
 
--- | Higher-order builtins: those that apply user functions or otherwise need
--- access to the evaluator. The singleton is the builtin's type, checked by GHC.
+-- higher-order builtins: those that apply user functions or otherwise need access to the evaluator.
+-- split out to avoid cyclic dependencies
 fetchBuiltinHigherOrder :: SWeedType t -> Builtin -> Eval (Value t)
 
--- identity: dom and cod are the same type
+-- identity
 fetchBuiltinHigherOrder (STFunction sa sb) Identity =
   case testEquality sa sb of
     Just Refl -> return $ VBuiltin $ TypedFun sa sb $ \v -> return v
@@ -69,7 +69,7 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa sb) (STFunction (STPool spa) 
           return $ VPool mappedPool mappedSource
     _ -> throwError $ InterpreterBug "Map: type mismatch"
 
--- mapP: ([a] -> b) -> Pool a -> Dice b
+-- mapP
 fetchBuiltinHigherOrder (STFunction (STFunction (STList sa) sb) (STFunction (STPool spa) (STDice sdb))) MapP =
   case (testEquality sa spa, testEquality sb sdb) of
     (Just Refl, Just Refl) ->
@@ -231,7 +231,7 @@ fetchBuiltinHigherOrder (STFunction (STList sa) STNumber) Length =
   return $ VBuiltin $ TypedFun (STList sa) STNumber $ \(VList l) ->
     return $ VNumber $ fromIntegral $ length $ getKept l
 
--- equality and comparison (polymorphic over Eq/Ord types)
+-- equality and comparison
 fetchBuiltinHigherOrder (STFunction sa (STFunction sb STBool)) Eq =
   case testEquality sa sb of
     Just Refl -> return $ mkEquality sa
@@ -252,7 +252,7 @@ fetchBuiltinHigherOrder (STFunction sa (STFunction sb STBool)) Lt = mkComparison
 fetchBuiltinHigherOrder (STFunction sa (STFunction sb STBool)) Ge = mkComparison sa sb (/= LT)
 fetchBuiltinHigherOrder (STFunction sa (STFunction sb STBool)) Gt = mkComparison sa sb (== GT)
 
--- liftMask: (a -> Bool) -> [a] -> [Bool]  or  ([a] -> [Bool]) -> [a] -> [Bool]
+-- liftMask
 fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STList sla) (STList slb))) LiftMask =
   case (testEquality sa sla, testEquality STBool slb) of
     (Just Refl, Just Refl) ->
@@ -268,15 +268,13 @@ fetchBuiltinHigherOrder (STFunction (STFunction (STList sa) (STList STBool)) (ST
           applyValue f l
     _ -> throwError $ InterpreterBug "LiftMask: type mismatch"
 
--- highest / lowest: Number -> [Number] -> [Bool]
+-- highest / lowest
 fetchBuiltinHigherOrder (STFunction STNumber (STFunction (STList STNumber) (STList STBool))) Highest =
   return $ mkHiLo Highest True
 fetchBuiltinHigherOrder (STFunction STNumber (STFunction (STList STNumber) (STList STBool))) Lowest =
   return $ mkHiLo Lowest False
 
--- keep / drop: s -> r a -> r a where s is a selector (a -> Bool or [a] -> [Bool])
--- and r is Rollable (Dice or Pool). The selector determines the mask; keep
--- retains elements where the mask is True, drop retains where it's False.
+-- keep / drop
 fetchBuiltinHigherOrder (STFunction sel (STFunction (STDice sda) (STPool spb))) b | b `elem` [Keep, Drop] =
   case testEquality sda spb of
     Just Refl -> return $ mkKeepDropDice b sel sda
@@ -286,7 +284,7 @@ fetchBuiltinHigherOrder (STFunction sel (STFunction (STPool spa) (STPool spb))) 
     Just Refl -> return $ mkKeepDropPool b sel spa
     Nothing -> throwError $ InterpreterBug "Keep/Drop: element type mismatch"
 
--- explode: (a -> Bool) -> r a -> Pool a
+-- explode
 fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STDice sda) (STPool spa))) Explode =
   case (testEquality sa sda, testEquality sa spa) of
     (Just Refl, Just Refl) ->
@@ -383,6 +381,14 @@ fetchBuiltinHigherOrder (STFunction sel (STFunction (STPool spa) (STPool spb))) 
       _ -> throwError $ InterpreterBug "RerollOnce: bad selector"
     Nothing -> throwError $ InterpreterBug "RerollOnce: element type mismatch"
 
+-- critsOn / failsOn
+fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STDice sda) (STDice sdb))) b | b `elem` [CritsOn, FailsOn] =
+  case testEquality sa sda of
+    Just Refl -> case testEquality sda sdb of
+      Just Refl -> return $ mkCritModifier sa (if b == CritsOn then critLevel else failLevel)
+      Nothing -> throwError $ InterpreterBug "CritsOn/FailsOn: element type mismatch"
+    Nothing -> throwError $ InterpreterBug "CritsOn/FailsOn: predicate type mismatch"
+
 fetchBuiltinHigherOrder _ b =
   throwError $ InterpreterBug $ "fetchBuiltinHigherOrder: not implemented or wrong type: " <> prettyPrint b
 
@@ -396,8 +402,27 @@ markRerolled :: Value a -> Value a
 markRerolled (VNumber n) = VNumber $ (metadata . _Just . reroll) .~ Multibool (1, 0) $ n
 markRerolled v = v
 
--- | Convert a selector (a -> Bool or [a] -> [Bool]) into a mask function
--- [a] -> [Bool] running in 'Roll'.
+-- set a Multibool metadata field on a number to (1,0) or (0,1) depending on the Bool.
+-- non-numbers pass through unchanged.
+setMeta :: Lens' NumberMetadata Multibool -> Bool -> Value a -> Value a
+setMeta lens isSet (VNumber n) =
+  VNumber $ (metadata . _Just . lens) .~ (if isSet then Multibool (1, 0) else Multibool (0, 1)) $ n
+setMeta _ _ v = v
+
+-- generalized implementation of critsOn / failsOn, parametrized over the lens
+mkCritModifier :: SWeedType a -> Lens' NumberMetadata Multibool -> Value (TFunction (TFunction a TBool) (TFunction (TApp TDice a) (TApp TDice a)))
+mkCritModifier sa lens = VBuiltin $ TypedFun (STFunction sa STBool) (STFunction (STDice sa) (STDice sa)) $ \predFn ->
+  return $ VBuiltin $ TypedFun (STDice sa) (STDice sa) $ \(VDice d) -> do
+    env <- askVars
+    fb <- askFetchBuiltin
+    let markIf v = do
+          r <- applyValueRoll fb env predFn v
+          case r of
+            VBool True  -> return (setMeta lens True v)
+            VBool False -> return (setMeta lens False v)
+    return $ VDice $ d >>= markIf
+
+-- convert a selector into [a] -> [Bool], inside the Roll monad
 runLiftMask :: FetchBuiltin -> Env -> SWeedType s -> SWeedType a -> Value s -> Eval (Value (TApp TList a) -> Roll (Value (TApp TList TBool)))
 runLiftMask fb env (STFunction sa STBool) sla predicate =
   case testEquality sa sla of
@@ -413,8 +438,7 @@ runLiftMask fb env (STFunction (STList sa) (STList STBool)) sla predicate =
     Nothing -> throwError $ InterpreterBug "runLiftMask: list element type mismatch"
 runLiftMask _ _ _ _ _ = throwError $ InterpreterBug "runLiftMask: selector is not a function"
 
--- | Shared keep/drop logic. The mask function runs in 'Roll' (it needs the
--- environment to apply closures, which 'applyValueRoll' provides).
+-- shared keep/drop logic.
 keepDropPool :: Builtin -> (Value (TApp TList a) -> Roll (Value (TApp TList TBool))) -> Roll (DropList (Value a)) -> Roll (Value a) -> Eval (Value (TApp TPool a))
 keepDropPool blt maskFn pool src = return $ VPool pool' src
   where
@@ -431,7 +455,7 @@ keepDropPool blt maskFn pool src = return $ VPool pool' src
               (D (VBool _)) -> return $ D v'
       DropList <$> zipWithM applyOne (getItems vals) (getItems maskResult)
 
--- | keep/drop for Dice: filtering a single die yields a pool of 0 or 1.
+-- keep/drop for Dice: filtering a single die yields a pool of 0 or 1.
 mkKeepDropDice :: Builtin -> SWeedType sel -> SWeedType a -> Value (TFunction sel (TFunction (TApp TDice a) (TApp TPool a)))
 mkKeepDropDice blt sel sa = VBuiltin $ TypedFun sel (STFunction (STDice sa) (STPool sa)) $ \predicate -> do
   env <- askVars
@@ -440,7 +464,7 @@ mkKeepDropDice blt sel sa = VBuiltin $ TypedFun sel (STFunction (STDice sa) (STP
   return $ VBuiltin $ TypedFun (STDice sa) (STPool sa) $ \(VDice dice) ->
     keepDropPool blt maskFn (one <$> dice) dice
 
--- | keep/drop for Pool
+-- keep/drop for Pool
 mkKeepDropPool :: Builtin -> SWeedType sel -> SWeedType a -> Value (TFunction sel (TFunction (TApp TPool a) (TApp TPool a)))
 mkKeepDropPool blt sel sa = VBuiltin $ TypedFun sel (STFunction (STPool sa) (STPool sa)) $ \predicate -> do
   env <- askVars
@@ -518,7 +542,7 @@ mkHiLo blt isHighest = VBuiltin $ TypedFun STNumber (STFunction (STList STNumber
         mask = map snd (sortWith fst tagged)
     return $ VList $ VBool <$> liftPredicate id (toDropList mask)
 
--- equality helper: works on any Eq-able type
+-- equality helper
 mkEquality :: SWeedType a -> Value (TFunction a (TFunction a TBool))
 mkEquality sa = VBuiltin $ TypedFun sa (STFunction sa STBool) $ \a ->
   return $ VBuiltin $ TypedFun sa STBool $ fmap VBool . equality a

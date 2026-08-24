@@ -92,9 +92,23 @@ instance Pretty Builtin where
   prettyPrint Reroll = "reroll"
   prettyPrint RerollOnce = "rerollOnce"
   prettyPrint Approximate = "approximate"
+  prettyPrint (MetaAccess mk mode) = accessorName mk mode
+  prettyPrint CritsOn = "critsOn"
+  prettyPrint FailsOn = "failsOn"
   prettyPrint Highest = "highest"
   prettyPrint Lowest = "lowest"
   prettyPrint Length = "length"
+
+accessorName :: MetaKind -> AccessMode -> Text
+accessorName mk mode = modeText mode <> kindText mk
+  where
+    modeText ASome = "some"
+    modeText AAll = "all"
+    modeText AAny = "any"
+    kindText MKCrit = "Crit"
+    kindText MKFail = "Fail"
+    kindText MKReroll = "Reroll"
+    kindText MKExtra = "Extra"
 
 instance Pretty IdentifierName where
   prettyPrint (S s) = show s

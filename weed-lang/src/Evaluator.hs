@@ -32,6 +32,7 @@ fetchBuiltin s b = case b of
   Or -> fetchBuiltinPure s b
   Xor -> fetchBuiltinPure s b
   Approximate -> fetchBuiltinPure s b
+  MetaAccess {} -> fetchBuiltinPure s b
   _ -> fetchBuiltinHigherOrder s b
 
 evalPreSample :: CoreTypedExpr -> Either EvaluationError SomeValue
