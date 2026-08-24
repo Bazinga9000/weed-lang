@@ -570,6 +570,9 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   "Number -> Number -> Number",
   "Arithmetic",
   fixity: "infixl 6",
+  aliases: [
+    "add"
+  ],
   examples: [
     ```haskell
     0.1 + 0.2   -- 3/10
@@ -582,10 +585,99 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 ]
 
 #builtin(
+  "(-)",
+  "Number -> Number -> Number",
+  "Arithmetic",
+  fixity: "infixl 6",
+  aliases: [
+    "sub"
+  ],
+)[
+  Subtracts the second number from the first.
+]
+
+#builtin(
+  "(*)",
+  "Number -> Number -> Number",
+  "Arithmetic",
+  fixity: "infixl 7",
+  aliases: [
+    "mul"
+  ],
+)[
+  Multiplies two numbers together.
+]
+
+#builtin(
+  "(/)",
+  "Number -> Number -> Number",
+  "Arithmetic",
+  fixity: "infixl 7",
+  aliases: [
+    "div"
+  ],
+)[
+  Divides the first number by the second.
+]
+
+#builtin(
+  "(%)",
+  "Number -> Number -> Number",
+  "Arithmetic",
+  fixity: "infixl 7",
+  aliases: [
+    "mod"
+  ],
+)[
+  Computes the remainder of the first number divided by the second.
+]
+
+#builtin(
+  "(^)",
+  "Number -> Number -> Number",
+  "Arithmetic",
+  fixity: "infixr 8",
+  aliases: [
+    "pow"
+  ],
+)[
+  Raises the first number to the power of the second.
+]
+
+#builtin(
+  "negate",
+  "Number -> Number",
+  "Arithmetic",
+  aliases: [
+    #op(`-`, `prefix`)
+  ],
+)[
+  Negates a number.
+]
+
+#builtin(
+  "floor",
+  "Number -> Number",
+  "Arithmetic",
+)[
+  Rounds a number down to the nearest integer. On complex numbers, follows APL's semantics (see #link("https://aplwiki.com/wiki/Complex_floor")[their wiki] for details).
+]
+
+#builtin(
+  "ceil",
+  "Number -> Number",
+  "Arithmetic",
+)[
+  Rounds a number up to the nearest integer. On complex numbers, follows APL's semantics (see #link("https://aplwiki.com/wiki/Complex_floor")[their wiki] for details).
+]
+#builtin(
   "(#)",
   "PositiveNatural -> Dice a -> Pool a",
   "Dice Operations",
   fixity: "infixr 5",
+  aliases: [
+    "poolify"
+  ],
 )[
   Repeatedly rolls a die a number of times and assembles them into a `Pool`.
 ]
@@ -658,10 +750,53 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 ]
 
 #builtin(
+  "not",
+  "Bool -> Bool",
+  "Logical",
+)[
+  Negates a boolean.
+]
+
+#builtin(
+  "(&&)",
+  "Bool -> Bool -> Bool",
+  "Logical",
+  fixity: "infixr 3",
+  aliases: [
+    "and"
+  ],
+)[
+  Logical conjunction.
+]
+
+#builtin(
+  "(||)",
+  "Bool -> Bool -> Bool",
+  "Logical",
+  fixity: "infixr 2",
+  aliases: [
+    "or"
+  ],
+)[
+  Logical disjunction.
+]
+
+#builtin(
+  "xor",
+  "Bool -> Bool -> Bool",
+  "Logical",
+)[
+  Logical exclusive-or.
+]
+
+#builtin(
   "map",
   "Functor f => (a -> b) -> f a -> f b",
   "Structures",
-  aliases: [#op(`<$>`, `infixl 4`)],
+  aliases: [
+    #op(`<$>`, `infixl 4`),
+    "fmap"
+  ],
   examples: [
     ```haskell
     (*2) <$> [1, 2, 3, 4, 5] -- [2, 4, 6, 8, 10]
@@ -726,6 +861,25 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
 ]
 
 #builtin(
+  "ap",
+  "Monad m => m (a -> b) -> m a -> m b",
+  "Structures",
+  aliases: [
+    #op(`<*>`, `infixl 4`)
+  ],
+)[
+  Applies a function inside a monad to a value inside the same monad.
+]
+
+#builtin(
+  "id",
+  "a -> a",
+  "Structures",
+)[
+  The identity function.
+]
+
+#builtin(
   "liftMask",
   "Selector a s => s -> [a] -> [Bool]",
   "Filtering",
@@ -753,6 +907,22 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   ],
 )[
   Extracts the canonical generator from a `Rollable`.
+]
+
+#builtin(
+  "constant",
+  "a -> Dice a",
+  "Dice",
+)[
+  A die that always rolls the given value. This is #ref-b("return") with a specialized type.
+]
+
+#builtin(
+  "collapse",
+  "Pool Number -> Dice Number",
+  "Dice",
+)[
+  Collapses a `Pool` of numbers into a single die that rolls their sum.
 ]
 
 #builtin(
@@ -813,6 +983,27 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   "Dice Modifiers",
 )[
   Each die that satisfies the predicate will spawn an additional copy of itself (whose output is tagged Extra) and add it to the resulting Pool. This applies recursively.
+]
+
+#builtin(
+  "critsOn",
+  "(a -> Bool) -> Dice a -> Dice a",
+  "Dice Modifiers",
+)[
+  Changes the input die so that it critical suceeds if and only if the predicate is met.
+
+  This will clobber any existing critical success metadata on the die.
+]
+
+
+#builtin(
+  "failsOn",
+  "(a -> Bool) -> Dice a -> Dice a",
+  "Dice Modifiers",
+)[
+  Changes the input die so that it critical fails if and only if the predicate is met.
+
+  This will clobber any existing critical failure metadata on the die.
 ]
 
 #builtin(
@@ -886,4 +1077,98 @@ To enable commonly used mixed-type operations (like `3d6 + 5`) to work without m
   Returns the number of (non-dropped) elements in the given list.
 ]
 
-// == Standard Library Functions
+#builtin(
+  "someCrit",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether some (but not all) of a value's constituent rolls critted. Pure numbers are `False`.
+]
+
+#builtin(
+  "allCrit",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether all of a value's constituent rolls critted. Pure numbers are `False`.
+]
+
+#builtin(
+  "anyCrit",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether any of a value's constituent rolls critted. Pure numbers are `False`.
+]
+
+#builtin(
+  "someFail",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether some (but not all) of a value's constituent rolls failed. Pure numbers are `False`.
+]
+
+#builtin(
+  "allFail",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether all of a value's constituent rolls failed. Pure numbers are `False`.
+]
+
+#builtin(
+  "anyFail",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether any of a value's constituent rolls failed. Pure numbers are `False`.
+]
+
+#builtin(
+  "someReroll",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether some (but not all) of a value's constituent rolls were rerolled. Pure numbers are `False`.
+]
+
+#builtin(
+  "allReroll",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether all of a value's constituent rolls were rerolled. Pure numbers are `False`.
+]
+
+#builtin(
+  "anyReroll",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether any of a value's constituent rolls were rerolled. Pure numbers are `False`.
+]
+
+#builtin(
+  "someExtra",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether some (but not all) of a value's constituent rolls were spawned by an explosion. Pure numbers are `False`.
+]
+
+#builtin(
+  "allExtra",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether all of a value's constituent rolls were spawned by an explosion. Pure numbers are `False`.
+]
+
+#builtin(
+  "anyExtra",
+  "Number -> Bool",
+  "Metadata Accessors",
+)[
+  Whether any of a value's constituent rolls were spawned by an explosion. Pure numbers are `False`.
+]
