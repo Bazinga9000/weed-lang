@@ -290,28 +290,27 @@ infer (CUIf cond t f) = do
         currSubst <- currentSubst <$> get
         let (bLvl, bBase) = peelEffect (apply currSubst branchT)
 
-        -- 1. Explicit Pool Collapse
+        -- Explicit Pool Collapse
         (tAfterCollapse, cAfterCollapse) <-
           if finalLvl == CtxDice && bLvl == CtxPool && apply currSubst bBase == TNumber
             then call1 Collapse branchT branchC
             else return (branchT, branchC)
 
-        -- 2. Explicit Scalar Promotion
+        -- Explicit Scalar Promotion
         cs'' <- currentSubst <$> get
         if finalLvl > CtxBase && fst (peelEffect (apply cs'' tAfterCollapse)) == CtxBase
           then do
-            -- 1. Perform the return call to lift the scalar
+            -- perform the return call to lift the scalar
             (tRet, cRet) <- call1 Return tAfterCollapse cAfterCollapse
 
-            -- 2. Force the 'm' in 'm a' to be our target effect (Dice or Pool)
-            -- USE 'finalBase' from the outer scope, NOT peelEffect on tRet.
+            -- force the 'm' in 'm a' to be our target effect (Dice or Pool)
             let target = applyEffect finalLvl finalBase
             unify tRet target
 
             return (tRet, cRet)
           else return (tAfterCollapse, cAfterCollapse)
 
-  -- 3. Coerce condition and branches so the typed AST is explicitly wrapped
+  -- coerce condition and branches so the typed AST is explicitly wrapped
   (_, ccCoerced) <- coerceBranch tc cc
   (_, ctCoerced) <- coerceBranch tt ct
   (_, cfCoerced) <- coerceBranch tf cf
