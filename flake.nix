@@ -15,6 +15,43 @@
       systems = nixpkgs.lib.systems.flakeExposed;
       imports = [ inputs.haskell-flake.flakeModule ];
 
+      flake.nixosModules.default = { config, lib, pkgs, ... }: {
+        options.services.weed-shds = with lib; {
+          enable = mkEnableOption "the weed-shds Discord bot";
+
+          package = mkOption {
+            type = types.package;
+            default = self.packages.${pkgs.stdenv.hostPlatform.system}.weed-shds;
+            defaultText = lib.literalExpression "self.packages.<system>.weed-shds";
+            description = "The weed-shds package to run.";
+          };
+
+          tokenPath = mkOption {
+            type = types.path;
+            description = ''
+              Path to a file containing the Discord bot token.
+            '';
+          };
+        };
+
+        config = lib.mkIf config.services.weed-shds.enable {
+          systemd.services.weed-shds = {
+            description = "weed-shds Discord bot";
+            wantedBy = [ "multi-user.target" ];
+            after = [ "network-online.target" ];
+            wants = [ "network-online.target" ];
+
+            serviceConfig = {
+              Type = "simple";
+              ExecStart = "${lib.getExe config.services.weed-shds.package}";
+              Environment = "TOKEN_FILE=${config.services.weed-shds.tokenPath}";
+              Restart = "on-failure";
+              RestartSec = 5;
+            };
+          };
+        };
+      };
+
       perSystem =
         { self', pkgs, lib, ... }:
         {
