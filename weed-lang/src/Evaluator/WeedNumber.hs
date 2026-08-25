@@ -23,7 +23,6 @@ blank x = WeedNumber {_value = x, _metadata = Just mempty}
 lift1WN :: (TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber
 lift1WN f x = x & value %~ f
 
--- all binary operations on WeedNumbers respect the drop semantics
 lift2WN :: (TowerNumber -> TowerNumber -> TowerNumber) -> WeedNumber -> WeedNumber -> WeedNumber
 lift2WN f x y = WeedNumber
         { _value = f (x ^. value) (y ^. value),
