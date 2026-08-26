@@ -517,6 +517,9 @@ If a primitive die that takes only one parameter is immediately suffixed with a 
 
 Similarly, if a primitive die is immediately prefixed with a literal number, this is desugared into an application of the die replication operator #ref-b("(#)"). For example, `8d6` is syntactic sugar for `8 # d 6`.
 
+#weed also supports two common notational extensions for atomic dice:
+- Suffixing with `!` for "#ref-b("explode") on a crit (particularly #ref-b("anyCrit")"
+- Suffixing with `kh`, `kl`, `dh`, `dl` and a number to more easily #ref-b("keep") or #ref-b("drop") the #ref-b("highest") or #ref-b("lowest") numbers of a pool. `k` and `d` also work in this context, with the same behavior as `kh` and `dl` respectively.
 
 = Type Coersion Rules
 
