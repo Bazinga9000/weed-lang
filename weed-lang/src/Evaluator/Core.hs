@@ -149,14 +149,14 @@ sample (SomeValue s v) evts = case v of
   VBuiltin builtin -> return $ Right $ (SomeValue s (VBuiltin builtin), evts)
   VDice d -> do
     d' <- roll d
-    return $ case d' of
-      Left err -> Left err
-      Right (v', evts') -> Right (SomeValue (diceElement s) v', evts <> evts')
+    case d' of
+      Left err -> return $ Left err
+      Right (v', evts') -> sample (SomeValue (diceElement s) v') (evts <> evts')
   VPool p _ -> do
     p' <- roll p
-    return $ case p' of
-      Left err -> Left err
-      Right (v', evts') -> Right (SomeValue (STList (poolElement s)) (VList v'), evts <> evts' <> [poolEvent v'])
+    case p' of
+      Left err -> return $ Left err
+      Right (v', evts') -> sample (SomeValue (STList (poolElement s)) (VList v')) (evts <> evts' <> [poolEvent v'])
   where
     diceElement :: SWeedType (TApp TDice a) -> SWeedType a
     diceElement (STDice s') = s'
