@@ -189,6 +189,7 @@ instance Pretty TypeError where
   prettyPrint (InfiniteType tv t) = "Infinite type: " <> prettyPrint tv <> " occurs in " <> prettyPrint t
   prettyPrint (CouldNotUnify t1 t2) = "Could not unify " <> prettyPrint t1 <> " and " <> prettyPrint t2
   prettyPrint (AmbiguousTypeVar tv c) = "Ambiguous type variable " <> prettyPrint tv <> " for class " <> prettyPrint c
+  prettyPrint (AmbiguousType t) = "Ambiguous type: " <> prettyPrint t
   prettyPrint (MissingInstance c) = "No instance for " <> prettyPrint c
   prettyPrint (TypeCheckerBug s) = "Type checker bug: " <> s
 

@@ -2,6 +2,8 @@
 module Parser.SurfaceParser (parseSurface, ParseError(..)) where
 import Parser.Lexer
 import AST
+import Data.Text qualified as T
+import Formatting.Pretty (Pretty (..))
 }
 %name parseSurface Exp
 %tokentype { Token }
@@ -195,6 +197,11 @@ BinOp : '.' { "." }
 type P = Either ParseError
 
 newtype ParseError = ParseError [Token] deriving Show
+
+instance Pretty ParseError where
+  prettyPrint (ParseError ts) = "Parse error near: " <> T.unwords (map prettyToken ts)
+    where
+      prettyToken t = fromString (show t)
 
 parseError :: [Token] -> P a
 parseError = Left . ParseError

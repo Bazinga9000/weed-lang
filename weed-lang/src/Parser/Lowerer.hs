@@ -5,6 +5,7 @@ import Control.Monad.RWS.CPS
 import Data.Graph (SCC (..), stronglyConnComp)
 import Data.List (lookup)
 import Data.Sequence qualified as S
+import Formatting.Pretty (Pretty (..))
 import Prelude hiding (Ap, Identity, Sum)
 
 data LoweringError
@@ -13,6 +14,12 @@ data LoweringError
   | BadBinaryOp String
   | InterpreterBug String
   deriving (Eq, Show)
+
+instance Pretty LoweringError where
+  prettyPrint TopLevelHole = "A bare top-level hole (_) is not allowed"
+  prettyPrint (BadUnaryOp op) = "Unknown unary operator: " <> fromString op
+  prettyPrint (BadBinaryOp op) = "Unknown binary operator: " <> fromString op
+  prettyPrint (InterpreterBug s) = "Interpreter bug: " <> fromString s
 
 type Lower = Either LoweringError
 

@@ -17,11 +17,11 @@ interpret :: (ToString s) => s -> IO (Either Text (Text, Maybe Text, Maybe Text)
 interpret input = do
   let toks = scanTokens $ toString input
   case parseSurface toks of
-    Left (ParseError ts) -> return $ Left $ "Parse error: " <> show ts
+    Left e -> return $ Left $ "Parse error: " <> prettyPrint e
     Right surface -> case lower surface of
-      Left e -> return $ Left $ "Lowering error: " <> show e
+      Left e -> return $ Left $ "Lowering error: " <> prettyPrint e
       Right coreu -> case typeCheck coreu of
-        Left e -> return $ Left $ "Type error: " <> show e
+        Left e -> return $ Left $ "Type error: " <> prettyPrint e
         Right coret -> do
           ev <- evaluate coret
           case ev of
