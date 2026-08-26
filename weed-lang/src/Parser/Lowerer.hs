@@ -172,7 +172,12 @@ liftHoles expr = do
       (body', h) <- captureHoles (liftExpr body)
       return $ SLambda ident (wrapLambdas h body')
     liftExpr (SUnaryOp op e) = SUnaryOp op <$> liftExpr e
-    liftExpr (SInfix op e1 e2) = liftA2 (SInfix op) (liftExpr e1) (liftExpr e2)
+    liftExpr (SInfix op e1 e2)
+      | op == ">>=" = do
+          (e1', h1) <- captureHoles (liftExpr e1)
+          (e2', h2) <- captureHoles (liftExpr e2)
+          return $ SInfix op (wrapLambdas h1 e1') (wrapLambdas h2 e2')
+      | otherwise = liftA2 (SInfix op) (liftExpr e1) (liftExpr e2)
     liftExpr (SApply e1 e2) = liftA2 SApply (liftExpr e1) (liftExpr e2)
     liftExpr (SIf cond t branchF) =
       liftA3 SIf (liftExpr cond) (liftExpr t) (liftExpr branchF)

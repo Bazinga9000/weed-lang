@@ -356,6 +356,7 @@ A *lifting boundary* is an expression envelope which captures any internal holes
 
 - *Grouping Parenthesis*: A pair of `(` and `)` that enclose an expression which contains either an infix operator or a pipe (#ref-b("(|)"). Parentheses wrapping _only_ standard function application cannot capture holes.
 - *Pipe*: A pipe (#ref-b("(|)")). Holes will _never_ lift past pipes.
+- *Monad Bind*: The monad bind operator (#ref-b("(>>=)"), in infix form.
 - *Declaration*: The binding of an expression to a variable.
 - *List Literals*: The outer delimiter `[`/`]` or separator `,` of a list literal.
 - *Lambda*: A lambda `\foo -> `.
