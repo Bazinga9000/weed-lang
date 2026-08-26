@@ -62,6 +62,7 @@ library
                     , Formatting.ANSI
                     , Formatting.Metadata
                     , Formatting.Pretty
+                    , Formatting.Rebuild
                     , TowerNumber.Internal.Core
                     , TowerNumber.Internal.Ops
                     , TowerNumber.Core

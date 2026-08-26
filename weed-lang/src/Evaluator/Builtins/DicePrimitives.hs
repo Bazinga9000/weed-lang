@@ -5,12 +5,14 @@ module Evaluator.Builtins.DicePrimitives where
 import AST
 import Control.Lens hiding (elements)
 import Control.Monad.Except
+import Control.Monad.Writer.Class (tell)
 import Data.Complex
 import Evaluator.Assertions
 import Evaluator.Metadata
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Evaluator.DropList (DropItem(K))
+import Formatting.Pretty (prettyPrint)
 import Numeric (log)
 import Test.QuickCheck.Gen
 import TowerNumber.Core
@@ -23,14 +25,27 @@ import TypeChecker.Types
 wrapOne :: SWeedType t -> (Builtin, Text) -> (WeedNumber -> Eval a) -> (a -> Gen (Value t)) -> Value (TFunction TNumber (TApp TDice t))
 wrapOne st (builtin, expected) assertion fn = VBuiltin $ TypedFun STNumber (STDice st) $ \(VNumber wn) -> do
   v' <- catchError (assertion wn) (const $ throwError $ BadDieParameter builtin ("expected " <> expected) (SomeValue STNumber (VNumber wn)))
-  return . VDice . liftGen . fn $ v'
+  return . VDice $ emitRoll st fn v'
 
 wrapTwo :: SWeedType t -> (Builtin, Text, Text) -> (WeedNumber -> Eval a) -> (WeedNumber -> Eval b) -> (a -> b -> Gen (Value t)) -> Value (TFunction TNumber (TFunction TNumber (TApp TDice t)))
 wrapTwo st (builtin, exp1, exp2) ass1 ass2 fn = VBuiltin $ TypedFun STNumber (STFunction STNumber (STDice st)) $ \(VNumber wa) ->
   return $ VBuiltin $ TypedFun STNumber (STDice st) $ \(VNumber wb) -> do
     va' <- catchError (ass1 wa) (const $ throwError $ BadDieParameter builtin ("expected " <> exp1) (SomeValue STNumber (VNumber wa)))
     vb' <- catchError (ass2 wb) (const $ throwError $ BadDieParameter builtin ("expected " <> exp2) (SomeValue STNumber (VNumber wb)))
-    return . VDice . liftGen $ fn va' vb'
+    return . VDice $ emitRoll2 st fn va' vb'
+
+-- sample a die and record the rolled value in the trace
+emitRoll :: SWeedType t -> (a -> Gen (Value t)) -> a -> Roll (Value t)
+emitRoll _ fn x = do
+  v <- liftGen (fn x)
+  tell [Rolled (prettyPrint v)]
+  return v
+
+emitRoll2 :: SWeedType t -> (a -> b -> Gen (Value t)) -> a -> b -> Roll (Value t)
+emitRoll2 _ fn x y = do
+  v <- liftGen (fn x y)
+  tell [Rolled (prettyPrint v)]
+  return v
 
 crit :: WeedNumber -> WeedNumber
 crit = (metadata . _Just . critLevel) .~ Multibool (1, 0)
@@ -131,7 +146,10 @@ binomial =
 
 -- coin
 coin :: Value (TApp TDice TBool)
-coin = VDice $ liftGen $ elements [VBool True, VBool False]
+coin = VDice $ do
+  v <- liftGen (elements [VBool True, VBool False])
+  tell [Rolled (prettyPrint v)]
+  return v
 
 -- circle
 circle :: Value (TFunction TNumber (TApp TDice TNumber))

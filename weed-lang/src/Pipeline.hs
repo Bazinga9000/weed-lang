@@ -1,18 +1,19 @@
 module Pipeline where
 
 import Evaluator
-import Evaluator.Types
 import Evaluator.DropList
 import Evaluator.WeedNumber (WeedNumber)
 import Formatting.Pretty (prettyPrint)
+import Formatting.Rebuild (rebuild)
 import Parser.Lexer
 import Parser.Lowerer
 import Parser.SurfaceParser
 import TypeChecker
 import TypeChecker.Singletons (SWeedType (..))
 
--- the full pipeline for an expression
-interpret :: (ToString s) => s -> IO (Either Text (Text, Maybe Text))
+-- the full pipeline for an expression.
+-- returns (the pretty-printed result, its autosum, the rebuilt eval log).
+interpret :: (ToString s) => s -> IO (Either Text (Text, Maybe Text, Maybe Text))
 interpret input = do
   let toks = scanTokens $ toString input
   case parseSurface toks of
@@ -25,7 +26,11 @@ interpret input = do
           ev <- evaluate coret
           case ev of
             Left err -> return $ Left $ "Evaluation error: " <> prettyPrint err
-            Right v -> return $ Right (prettyPrint v, prettyPrint <$> autoSum v)
+            Right (v, evts) ->
+              let res = prettyPrint v
+                  as = prettyPrint <$> autoSum v
+                  log = rebuild evts
+               in return $ Right (res, as, log)
 
 -- collapses (nested) lists of numbers into their sum
 autoSum :: SomeValue -> Maybe SomeValue

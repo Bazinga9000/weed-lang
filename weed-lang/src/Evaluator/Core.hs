@@ -5,21 +5,27 @@ module Evaluator.Core
   , runEval
   , evaluate
   , evalPreSample
+  , liftScalar
   ) where
 
 import AST
 import Control.Monad.Except (throwError)
+import Control.Monad.Writer.CPS (runWriter)
+import Control.Monad.Writer.Class (tell)
 import Data.Map qualified as Map
 import Data.Type.Equality (testEquality, (:~:) (Refl))
 import Evaluator.Types
 import Evaluator.WeedNumber
 import Evaluator.DropList
+import Formatting.Pretty (prettyPrint)
 import TypeChecker
 import TypeChecker.Singletons
 import TypeChecker.Types
 
-runEval :: FetchBuiltin -> Env -> Eval a -> Either EvaluationError a
-runEval fb env ev = let r = runExceptT ev in runReader r (EvalEnv env fb)
+runEval :: FetchBuiltin -> Env -> Eval a -> Either EvaluationError (a, [TraceEvent])
+runEval fb env ev =
+  let (ea, evts) = runWriter (runReaderT (runExceptT ev) (EvalEnv env fb))
+   in fmap (\a -> (a, evts)) ea
 
 applyValue :: Value (TFunction a b) -> Value a -> Eval (Value b)
 applyValue (VClosure rho sa ident body) arg =
@@ -29,7 +35,7 @@ applyValue (VBuiltin (TypedFun _ _ f)) arg = f arg
 applyValueRoll :: FetchBuiltin -> Env -> Value (TFunction a b) -> Value a -> Roll (Value b)
 applyValueRoll fb env f arg = case runEval fb env (applyValue f arg) of
   Left err -> throwError err
-  Right v -> return v
+  Right (v, evts) -> tell evts >> return v
 
 eval :: CoreElaboratedExpr t -> Eval (Value t)
 eval (CENumber n) = return $ VNumber $ literal n
@@ -102,13 +108,21 @@ eval (CEIfPool cond thn els) = do
                 VPool _ br' -> br') vs
        in return $ VPool epool' esrc'
 
+-- lift a scalar into a dice context, recording it in the trace.
+-- the Lifted event is emitted when the die is sampled, so it appears in
+-- the trace in the correct position relative to the surrounding rolls/ops.
+liftScalar :: SWeedType a -> Value a -> Eval (Value (TApp TDice a))
+liftScalar _ v = return $ VDice $ do
+  tell [Lifted (prettyPrint v)]
+  return v
+
 runBranch :: Eval (CoreElaboratedExpr r -> Roll (Value r))
 runBranch = do
   env <- askVars
   fb <- askFetchBuiltin
   return $ \expr -> case runEval fb env (eval expr) of
     Left err -> throwError err
-    Right v -> return v
+    Right (v, evts) -> tell evts >> return v
 
 -- a letrec lambda binding, packaged with its types.
 data SomeLambda = forall a b. SomeLambda (SWeedType a) (SWeedType b) IdentifierName (CoreElaboratedExpr b)
@@ -118,38 +132,49 @@ lamClosure rho (SomeLambda sa sb argName lamBody) = SomeValue (STFunction sa sb)
 
 -- elaborates and then evaluates a typeChecked expression
 -- elaboration error is considered an interpreter bug
-evalPreSample :: FetchBuiltin -> CoreTypedExpr -> Either EvaluationError SomeValue
+evalPreSample :: FetchBuiltin -> CoreTypedExpr -> Either EvaluationError (SomeValue, [TraceEvent])
 evalPreSample fb expr = case elaborate expr of
   Left err -> throwError $ InterpreterBug $ "evalPreSample: elaboration failed: " <> show err
   Right (SomeCoreElaboratedExpr s e) -> do
-    v <- runEval fb Map.empty (eval e)
-    return $ SomeValue s v
+    (v, evts) <- runEval fb Map.empty (eval e)
+    return (SomeValue s v, evts)
 
-sample :: SomeValue -> IO (Either EvaluationError SomeValue)
-sample (SomeValue s v) = case v of
-  VNumber n -> return $ Right $ SomeValue s (VNumber n)
-  VBool b -> return $ Right $ SomeValue s (VBool b)
-  VUnit -> return $ Right $ SomeValue s VUnit
-  VList xs -> return $ Right $ SomeValue s (VList xs)
-  VClosure rho sa ident body -> return $ Right $ SomeValue s (VClosure rho sa ident body)
-  VBuiltin builtin -> return $ Right $ SomeValue s (VBuiltin builtin)
+sample :: SomeValue -> [TraceEvent] -> IO (Either EvaluationError (SomeValue, [TraceEvent]))
+sample (SomeValue s v) evts = case v of
+  VNumber n -> return $ Right $ (SomeValue s (VNumber n), evts)
+  VBool b -> return $ Right $ (SomeValue s (VBool b), evts)
+  VUnit -> return $ Right $ (SomeValue s VUnit, evts)
+  VList xs -> return $ Right $ (SomeValue s (VList xs), evts)
+  VClosure rho sa ident body -> return $ Right $ (SomeValue s (VClosure rho sa ident body), evts)
+  VBuiltin builtin -> return $ Right $ (SomeValue s (VBuiltin builtin), evts)
   VDice d -> do
     d' <- roll d
     return $ case d' of
       Left err -> Left err
-      Right v' -> Right $ SomeValue (diceElement s) v'
+      Right (v', evts') -> Right (SomeValue (diceElement s) v', evts <> evts')
   VPool p _ -> do
     p' <- roll p
     return $ case p' of
       Left err -> Left err
-      Right v' -> Right $ SomeValue (STList (poolElement s)) (VList v')
+      Right (v', evts') -> Right (SomeValue (STList (poolElement s)) (VList v'), evts <> evts' <> [poolEvent v'])
   where
     diceElement :: SWeedType (TApp TDice a) -> SWeedType a
     diceElement (STDice s') = s'
     poolElement :: SWeedType (TApp TPool a) -> SWeedType a
     poolElement (STPool s') = s'
 
-evaluate :: FetchBuiltin -> CoreTypedExpr -> IO (Either EvaluationError SomeValue)
+-- record a pool's final contents, marking dropped dice, and its total.
+poolEvent :: DropList (Value a) -> TraceEvent
+poolEvent dl = Pooled items total
+  where
+    items = map item (getItems dl)
+    item (K v) = (prettyPrint v, True)
+    item (D v) = (prettyPrint v, False)
+    total = do
+      kept <- mapM (\case VNumber n -> Just n; _ -> Nothing) [v | K v <- getItems dl]
+      Just $ prettyPrint (VNumber (sum kept))
+
+evaluate :: FetchBuiltin -> CoreTypedExpr -> IO (Either EvaluationError (SomeValue, [TraceEvent]))
 evaluate fb expr = case evalPreSample fb expr of
   Left err -> return $ Left err
-  Right v -> sample v
+  Right (v, evts) -> sample v evts

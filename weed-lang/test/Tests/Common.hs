@@ -3,7 +3,6 @@ module Tests.Common where
 import AST
 import Evaluator
 import Evaluator.DropList (getKept, toDropList)
-import Evaluator.Types (SomeValue (..), Value (..))
 import Evaluator.WeedNumber (literal, (=~=))
 import Formatting.Pretty (prettyPrint)
 import Test.Tasty
@@ -26,7 +25,7 @@ eqObservable _ _ = False
 
 assertEval :: CoreTypedExpr -> SomeValue -> Assertion
 assertEval expr expected = case evalPreSample expr of
-  Right actual ->
+  Right (actual, _) ->
     if actual `eqObservable` expected
       then pass
       else

@@ -3,6 +3,7 @@ module Evaluator.Builtins.HigherOrder (fetchBuiltinHigherOrder) where
 import AST
 import Control.Lens ((.~), _Just, Lens')
 import Control.Monad.Except
+import Control.Monad.Writer.Class (tell)
 import Data.Type.Equality (testEquality, (:~:) (Refl))
 import Evaluator.Assertions
 import Evaluator.Builtins.DicePrimitives qualified as D
@@ -29,7 +30,7 @@ fetchBuiltinHigherOrder (STFunction sa sb) Identity =
 -- return / pure
 fetchBuiltinHigherOrder (STFunction sa (STDice sb)) Return =
   case testEquality sa sb of
-    Just Refl -> return $ VBuiltin $ TypedFun sa (STDice sb) $ \v -> return $ VDice $ return v
+    Just Refl -> return $ VBuiltin $ TypedFun sa (STDice sb) $ \v -> liftScalar sa v
     Nothing -> throwError $ InterpreterBug "Return: element type mismatch"
 fetchBuiltinHigherOrder (STFunction sa (STList sb)) Return =
   case testEquality sa sb of
@@ -194,7 +195,12 @@ fetchBuiltinHigherOrder (STFunction sa (STDice sb)) Constant =
 -- collapse
 fetchBuiltinHigherOrder (STFunction (STPool STNumber) (STDice STNumber)) Collapse =
   return $ VBuiltin $ TypedFun (STPool STNumber) (STDice STNumber) $ \(VPool pool _) ->
-    return $ VDice $ VNumber . sum . getKept <$> (pool >>= mapMDropList (\(VNumber n) -> return n))
+    return $ VDice $ do
+      vals <- pool >>= mapMDropList (\(VNumber n) -> return n)
+      let kept = getKept vals
+      let total = sum kept
+      tell [Pooled (map (\v -> (prettyPrint v, True)) kept) (Just (prettyPrint (VNumber total)))]
+      return $ VNumber total
 
 -- source
 fetchBuiltinHigherOrder (STFunction (STDice sa) (STDice sb)) Source =
@@ -327,7 +333,7 @@ fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STDice s
         return $ VBuiltin $ TypedFun (STFunction sa STBool) (STFunction (STDice sda) (STDice sdb)) $ \predicate ->
           return $ VBuiltin $ TypedFun (STDice sda) (STDice sdb) $ \(VDice dice) -> do
             rd <- localReroll True predicate dice
-            return $ VDice rd
+            return $ VDice $ finalizeDie rd
       Nothing -> throwError $ InterpreterBug "Reroll: element type mismatch"
     Nothing -> throwError $ InterpreterBug "Reroll: predicate type mismatch"
 fetchBuiltinHigherOrder (STFunction (STFunction sa STBool) (STFunction (STPool spa) (STPool spb))) Reroll =
@@ -350,14 +356,14 @@ fetchBuiltinHigherOrder (STFunction sel (STFunction (STDice sda) (STDice sdb))) 
           return $ VBuiltin $ TypedFun sel (STFunction (STDice sda) (STDice sdb)) $ \predicate ->
             return $ VBuiltin $ TypedFun (STDice sda) (STDice sdb) $ \(VDice dice) -> do
               rd <- localReroll False predicate dice
-              return $ VDice rd
+              return $ VDice $ finalizeDie rd
         Nothing -> throwError $ InterpreterBug "RerollOnce: predicate type mismatch"
       STFunction (STList sa) (STList STBool) -> case testEquality sa sda of
         Just Refl ->
           return $ VBuiltin $ TypedFun sel (STFunction (STDice sda) (STDice sdb)) $ \predicate ->
             return $ VBuiltin $ TypedFun (STDice sda) (STDice sdb) $ \(VDice dice) -> do
               rd <- globalReroll predicate (one <$> dice) dice
-              return $ VDice $ dropListSingle rd
+              return $ VDice $ finalizeDie (dropListSingle rd)
         Nothing -> throwError $ InterpreterBug "RerollOnce: predicate type mismatch"
       _ -> throwError $ InterpreterBug "RerollOnce: bad selector"
     Nothing -> throwError $ InterpreterBug "RerollOnce: element type mismatch"
@@ -401,6 +407,14 @@ freshExtra v = v
 markRerolled :: Value a -> Value a
 markRerolled (VNumber n) = VNumber $ (metadata . _Just . reroll) .~ Multibool (1, 0) $ n
 markRerolled v = v
+
+-- a rerolled die emits several Rolled events, but it's not a Pool so it never gets
+-- a corresponding Pooled. Collapse into a single pool so the rebuild only has one die
+finalizeDie :: Roll (Value a) -> Roll (Value a)
+finalizeDie rd = do
+  v <- rd
+  tell [Pooled [(prettyPrint v, True)] (Just (prettyPrint v))]
+  return v
 
 -- set a Multibool metadata field on a number to (1,0) or (0,1) depending on the Bool.
 -- non-numbers pass through unchanged.

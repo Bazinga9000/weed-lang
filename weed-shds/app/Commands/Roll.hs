@@ -21,8 +21,8 @@ fetchUserName (MemberOrUser (Right u)) = userName u
 clamp :: Text -> Maybe Text
 clamp s = if T.length s >= 900 then Nothing else Just s
 
-clampResult :: (Text, Maybe Text) -> (Maybe Text, Maybe Text)
-clampResult (r, as) = (clamp r, as >>= clamp)
+clampResult :: (Text, Maybe Text, Maybe Text) -> (Maybe Text, Maybe Text, Maybe Text)
+clampResult (r, as, lg) = (clamp r, as >>= clamp, lg >>= clamp)
 
 roll :: SlashCommand s
 roll = buildCommand "roll" "Roll dice, backed by WEED." $
@@ -41,25 +41,28 @@ rollHandler input intr = do
                   ansiFormatString Red Normal err,
                   "```"
                 ]
-              Right (Nothing, Nothing) ->
+              Right (Nothing, _, _) ->
                 [ preamble <> " failed with error:",
                   "```ansi",
                   ansiFormatString Red Normal "Discord Message would be too long",
                   "```"
                 ]
-              Right (Just res, Nothing) ->
+              Right (_, Just autosum, Just lg) ->
                 [ preamble <> " rolled:",
+                  "### " <> clearANSI autosum,
+                  "```ansi",
+                  lg,
+                  "```"
+                ]
+              Right (Just res, Just autosum, Nothing) ->
+                [ preamble <> " rolled:",
+                  "### " <> clearANSI autosum,
                   "```ansi",
                   res,
                   "```"
                 ]
-              Right (Nothing, Just autosum) ->
+              Right (Just res, Nothing, _) ->
                 [ preamble <> " rolled:",
-                  "### " <> autosum
-                ]
-              Right (Just res, Just autosum) ->
-                [ preamble <> " rolled:",
-                  "### " <> autosum,
                   "```ansi",
                   res,
                   "```"

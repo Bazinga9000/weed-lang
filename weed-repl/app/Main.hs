@@ -18,5 +18,5 @@ main = runInputT defaultSettings loop
           interpreted <- liftIO $ interpret input
           putTextLn $ case interpreted of
             Left err -> ansiFormatString Red Normal err
-            Right (res, _) -> res -- the repl doesn't autosum, here we assume you're doing it manually
+            Right (res, _, _) -> res
           loop

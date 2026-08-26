@@ -1,6 +1,8 @@
 module Evaluator.Types where
 
 import AST
+import Control.Monad.Writer.CPS (Writer)
+import Control.Monad.Writer.Lazy (WriterT (..), runWriterT)
 import Data.Map qualified as Map
 import Evaluator.WeedNumber (WeedNumber)
 import Evaluator.DropList (DropList)
@@ -23,13 +25,26 @@ data EvaluationError
   | InfiniteRecursiveBinding
   | InterpreterBug Text
 
-type Roll a = ExceptT EvaluationError Gen a
+-- a single step in the evaluation trace, used to reconstruct a readable log.
+-- values are stored as already-pretty-printed text.
+data TraceEvent
+  = Rolled Text -- a single die rolled this value
+  | Pooled [(Text, Bool)] (Maybe Text) -- a pool's final contents: (value, kept?) and its total (if summable)
+  | Lifted Text -- a scalar lifted into a dice/pool context
+  | Applied Builtin [Text] Text -- builtin, operand values, result
+  deriving (Show, Eq)
+
+type Roll a = ExceptT EvaluationError (WriterT [TraceEvent] Gen) a
+
+type Eval a = ExceptT EvaluationError (ReaderT EvalEnv (Writer [TraceEvent])) a
 
 liftGen :: Gen a -> Roll a
-liftGen = ExceptT . fmap Right
+liftGen g = ExceptT $ WriterT $ fmap (\a -> (Right a, [])) g
 
-roll :: Roll a -> IO (Either EvaluationError a)
-roll = generate . runExceptT
+roll :: Roll a -> IO (Either EvaluationError (a, [TraceEvent]))
+roll r = generate $ do
+  (ea, evts) <- runWriterT (runExceptT r)
+  pure $ fmap (\a -> (a, evts)) ea
 
 -- builtin dispatcher
 -- caller provides this to avoid module cycle
@@ -39,8 +54,6 @@ data EvalEnv = EvalEnv
   { envVars :: Env
   , envFetchBuiltin :: FetchBuiltin
   }
-
-type Eval a = ExceptT EvaluationError (Reader EvalEnv) a
 
 askFetchBuiltin :: Eval FetchBuiltin
 askFetchBuiltin = asks envFetchBuiltin

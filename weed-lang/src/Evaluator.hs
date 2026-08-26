@@ -1,5 +1,6 @@
 module Evaluator
   ( module Evaluator.Core
+  , module Evaluator.Types
   , fetchBuiltin
   , evalPreSample
   , evaluate
@@ -35,8 +36,8 @@ fetchBuiltin s b = case b of
   MetaAccess {} -> fetchBuiltinPure s b
   _ -> fetchBuiltinHigherOrder s b
 
-evalPreSample :: CoreTypedExpr -> Either EvaluationError SomeValue
+evalPreSample :: CoreTypedExpr -> Either EvaluationError (SomeValue, [TraceEvent])
 evalPreSample = Core.evalPreSample (FetchBuiltin fetchBuiltin)
 
-evaluate :: CoreTypedExpr -> IO (Either EvaluationError SomeValue)
+evaluate :: CoreTypedExpr -> IO (Either EvaluationError (SomeValue, [TraceEvent]))
 evaluate = Core.evaluate (FetchBuiltin fetchBuiltin)
