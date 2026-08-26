@@ -5,6 +5,7 @@ data TypeError
   | InfiniteType TypeVarName WeedType
   | CouldNotUnify WeedType WeedType
   | AmbiguousTypeVar TypeVarName WeedTypeClass
+  | AmbiguousType WeedType
   | MissingInstance WeedTypeClass
   | TypeCheckerBug Text
   deriving (Show, Eq)

@@ -5,6 +5,7 @@ module TypeChecker where
 import AST
 import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.RWS.CPS (censor, listen, runRWST, tell)
+import Data.Set qualified as Set
 import Data.Type.Equality hiding (apply)
 import TypeChecker.BuiltinTypes
 import TypeChecker.Infer
@@ -356,7 +357,12 @@ typeCheck expr = do
   -- solve the constraints
   solve subst constraints
   -- if we got here, constraint solving succeded, apply the final subs to concretize every node's type
-  return $ apply subst typed
+  let typed' = apply subst typed
+  -- reject any type variables that survived constraint solving (e.g. \x -> x)
+  -- these are ambiguous and cannot be elaborated
+  case ftv (getType typed') of
+    s | Set.null s -> Right typed'
+      | otherwise -> throwError $ AmbiguousType (getType typed')
 
 elaborate :: CoreTypedExpr -> Either TypeError SomeCoreElaboratedExpr
 elaborate e = do
